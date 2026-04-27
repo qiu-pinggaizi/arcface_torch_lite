@@ -301,6 +301,26 @@ config.distill_loss_type = "cosine" # cosine / l2
 
 > 详细实验报告见 [docs/lightweight_experiment_report.md](docs/lightweight_experiment_report.md)
 
+## TODO
+
+详见 [TODO.md](TODO.md)
+
+### 多数据加载训练
+
+- [ ] 完善多数据集训练配置，支持更多数据集组合
+- [ ] 测试多数据集训练在不同 GPU 配置下的稳定性
+- [ ] 验证多数据集训练的模型精度是否达到预期
+- [ ] 优化数据加载性能，减少多 dataloader 的内存开销
+- [ ] 添加更多数据集的配置文件模板
+
+### 训练模型开源
+
+- [ ] 整理训练日志和实验结果
+- [ ] 编写模型发布文档，包含训练配置和使用说明
+- [ ] 准备模型权重文件（ONNX 格式）
+- [ ] 更新 README 中的实验结果和模型下载链接
+- [ ] 创建 GitHub Release 发布模型
+
 ## 参考文献
 
 ```bibtex
