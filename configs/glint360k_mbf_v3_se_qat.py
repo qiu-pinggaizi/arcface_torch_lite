@@ -4,12 +4,12 @@ config = edict()
 
 # 模型配置
 config.network = "mbf_v3_se_qat"  # QAT 版本
-config.output = "/ipcdata-bj/data/jinj/face_rec_train_result/mbf_v3_se_qat"
+config.output = "output/"
 config.embedding_size = 512
 
 # 剪枝配置（必须与 Phase 3+ 一致）
 config.prune_ratio = 0.2
-config.prune_load = "/ipcdata-bj/data/jinj/face_rec_train_result/mbf_v3_se_distill_prune/model.pt"
+config.prune_load = "/path/to/pruned/model.pt"
 
 # QAT 配置
 config.qat_backend = "fbgemm"  # CPU 推理用 fbgemm，移动端用 qnnpack
@@ -26,7 +26,7 @@ config.warmup_epoch = 0         # QAT 不需要 warmup
 config.fp16 = False             # QAT 要求 FP32
 
 # 数据配置
-config.rec = "/ipcdata-tj/data/jinj/glint360k"
+config.rec = "/path/to/glint360k"
 config.num_classes = 360232
 config.num_image = 17091657
 config.num_workers = 2

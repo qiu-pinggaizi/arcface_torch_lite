@@ -19,7 +19,7 @@ config.lr = 0.2
 config.verbose = 10000
 config.dali = False
 
-config.rec = "/train_tmp/WebFace42M"
+config.rec = "/path/to/glint360k"
 config.num_classes = 2059906
 config.num_image = 42474557
 config.num_epoch = 20

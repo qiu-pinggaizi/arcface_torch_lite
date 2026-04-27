@@ -15,7 +15,7 @@ config.weight_decay = 5e-4
 config.batch_size = 512 # total_batch_size = batch_size * num_gpus
 config.lr = 0.1  # batch size is 512
 
-config.rec = "synthetic"
+config.rec = "/path/to/glint360k"
 config.num_classes = 30 * 10000
 config.num_image = 100000
 config.num_epoch = 30

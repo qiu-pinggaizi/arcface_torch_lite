@@ -7,8 +7,8 @@ cd "$PROJECT_ROOT"
 
 
 # 设置路径
-CODE_ROOT="/ipcdata-bj/data/jinj/WebFace260M"  # 代码保存路径
-DATA_ROOT="/ipcdata-bj/data/jinj/WebFace260M/WebFace260M/WebFace260M"  # 数据路径
+CODE_ROOT="/path/to/WebFace260M"  # 代码保存路径
+DATA_ROOT="/path/to/WebFace260M/WebFace260M/WebFace260M"  # 数据路径
 OUTPUT_PREFIX="train"
 
 # 进入数据目录（lst/rec 文件生成在这里）

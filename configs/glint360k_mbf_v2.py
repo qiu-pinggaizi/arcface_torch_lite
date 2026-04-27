@@ -7,8 +7,8 @@ from easydict import EasyDict as edict
 config = edict()
 config.margin_list = (1.0, 0.0, 0.4)
 config.network = "mbf_large_v2"
-# config.resume = "ipcdata-bj/data/jinj/face_rec_train_result/mbf_large_v2/model.pt"
-config.output = "/ipcdata-ak/data/jiangnanfei/code/IPC/arcface-jinj/arcface_torch/face_rec_train_result/mbf_large_v2"
+# config.resume = "/path/to/checkpoint"
+config.output = "output/"
 config.embedding_size = 512
 config.sample_rate = 0.9
 config.fp16 = True
@@ -19,10 +19,9 @@ config.lr = 0.1
 config.verbose = 5000
 config.dali = False
 config.frequent = 60
-# config.wandb_key = "51157ef3d01a6b1cf6ddcc79ce57b03fe67aded1"
-# config.using_wandb = 1
+config.using_wandb = False
 
-config.rec = "/ipcdata-ak/data/jiangnanfei/code/IPC/arcface-jinj/arcface_torch/data/glint360k"
+config.rec = "/path/to/glint360k"
 config.num_classes = 360232
 config.num_image = 17091657
 config.num_epoch = 50

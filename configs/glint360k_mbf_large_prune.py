@@ -7,7 +7,7 @@ from easydict import EasyDict as edict
 config = edict()
 config.margin_list = (1.0, 0.0, 0.4)
 config.network = "mbf_large"
-config.output = "/ipcdata-bj/data/jinj/face_rec_train_result/mbf_large_0.4ir_prune"
+config.output = "output/"
 
 config.embedding_size = 512
 config.sample_rate = 0.9
@@ -21,11 +21,9 @@ config.dali = False
 config.frequent = 60
 config.save_all_states = True
 config.gradient_acc = 2
-config.resume = "/ipcdata-bj/data/jinj/face_rec_train_result/mbf_large_0.3ir_prune"
-# config.wandb_key = "51157ef3d01a6b1cf6ddcc79ce57b03fe67aded1"
-# config.using_wandb = 1
+config.resume = "/path/to/checkpoint"
 
-config.rec = "/ipcdata-tj/data/jinj/glint360k"
+config.rec = "/path/to/glint360k"
 config.num_classes = 360232
 config.num_image = 17091657
 config.num_epoch = 75

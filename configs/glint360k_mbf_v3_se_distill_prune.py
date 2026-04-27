@@ -4,7 +4,7 @@ config = edict()
 
 # 模型配置
 config.network = "mbf_v3_se"  # student
-config.output = "/ipcdata-bj/data/jinj/face_rec_train_result/mbf_v3_se_distill_prune"
+config.output = "output/"
 config.embedding_size = 512
 
 # 剪枝配置 (Student)
@@ -13,7 +13,7 @@ config.prune_ratio = 0.2
 # 蒸馏配置
 config.distill = True
 config.teacher_network = "mbf_large"
-config.teacher_checkpoint = "/ipcdata-bj/data/jinj/face_rec_train_result/mbf_large/model.pt"
+config.teacher_checkpoint = "/path/to/teacher/model.pt"
 config.teacher_prune_ratio = None  # teacher 不剪枝
 config.distill_alpha = 0.5  # CE loss 和 distill loss 各占一半
 config.distill_loss_type = "cosine"
@@ -30,7 +30,7 @@ config.warmup_epoch = 1
 config.fp16 = True
 
 # 数据配置
-config.rec = "/ipcdata-tj/data/jinj/glint360k"
+config.rec = "/path/to/glint360k"
 config.num_classes = 360232
 config.num_image = 17091657
 config.num_workers = 2

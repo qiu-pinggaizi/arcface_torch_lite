@@ -1,17 +1,10 @@
-'''
-Author: jinjie xinjie@xiaomi.com
-Date: 2026-04-22 17:26:26
-LastEditors: jinjie xinjie@xiaomi.com
-LastEditTime: 2026-04-22 17:42:00
-FilePath: /face_rec/arcface_torch_5max/configs/glint360k_femv2_se_mutant_a1.py
-'''
 from easydict import EasyDict as edict
 
 config = edict()
 
 # 模型配置
 config.network = "femv2_se_mutant_a1"
-config.output = "/ipcdata-bj/data/jinj/face_rec_train_result/femv2_se_mutant_a1"
+config.output = "output/"
 config.embedding_size = 512
 
 # 训练配置
@@ -26,7 +19,7 @@ config.warmup_epoch = 5
 config.fp16 = True
 
 # 数据配置
-config.rec = "/ipcdata-tj/data/jinj/glint360k"
+config.rec = "/path/to/glint360k"
 config.num_classes = 360232
 config.num_image = 17091657
 config.num_workers = 2

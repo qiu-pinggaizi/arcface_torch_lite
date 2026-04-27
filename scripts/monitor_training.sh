@@ -9,7 +9,7 @@ cd "$PROJECT_ROOT"
 
 REMOTE_HOST="S1-2"
 LOG_FILE="/home/M40/face_rec/arcface_torch_5max/EXPERIMENT_LOG.md"
-CHECKPOINT_DIR="/ipcdata-bj/data/jinj/face_rec_train_result/mbf_v3"
+CHECKPOINT_DIR="/path/to/checkpoint"
 
 echo "=========================================="
 echo "训练监控报告 - $(date '+%Y-%m-%d %H:%M:%S')"

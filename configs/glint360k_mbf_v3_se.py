@@ -2,7 +2,7 @@ from easydict import EasyDict as edict
 
 config = edict()
 config.network = "mbf_v3_se"
-config.output = "/ipcdata-bj/data/jinj/face_rec_train_result/mbf_v3_se"
+config.output = "output/"
 config.embedding_size = 512
 config.optimizer = "sgd"
 config.margin_list = (1.0, 0.0, 0.4)
@@ -17,7 +17,7 @@ config.verbose = 5000
 config.frequent = 60
 config.dali = False
 config.save_all_states = True
-config.rec = "/ipcdata-tj/data/jinj/glint360k"
+config.rec = "/path/to/glint360k"
 config.num_classes = 360232
 config.num_image = 17091657
 config.num_epoch = 90

@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-SHARED_DIR = r'/ipcdata-tj/duguohui/face_recognition_flow/ModelEvolutionEngine/datasets/06_2d_feature_extraction'
+SHARED_DIR = r'/path/to/dataset'
 if not os.path.isdir(SHARED_DIR):
     # fallback: 向上遍历查找包含 'datasets' 子目录的 automl 根目录
     _cur = os.path.abspath(SCRIPT_DIR)

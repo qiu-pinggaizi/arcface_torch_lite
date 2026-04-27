@@ -85,7 +85,7 @@ if __name__ == '__main__':
     from backbones import get_model
 
     parser = argparse.ArgumentParser(description='ArcFace PyTorch to onnx')
-    parser.add_argument('-i','--input', type=str, default="/ipcdata-ak/data/jiangnanfei/code/IPC/arcface-jinj/arcface_torch/face_rec_train_result/jinj-org-5max/model.pt", help='input backbone.pth file or path')
+    parser.add_argument('-i','--input', type=str, default="/path/to/model.pt", help='input backbone.pth file or path')
     parser.add_argument('-o','--output', type=str, default=None, help='output onnx path')
     parser.add_argument('--network', type=str, default="mbf_large", help='backbone network')
     parser.add_argument('--simplify', type=bool, default=True, help='onnx simplify')

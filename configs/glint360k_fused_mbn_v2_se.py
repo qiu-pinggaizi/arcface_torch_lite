@@ -4,7 +4,7 @@ config = edict()
 
 # 模型配置
 config.network = "fused_mbn_v2_se"
-config.output = "/ipcdata-bj/data/jinj/face_rec_train_result/fused_mbn_v2_se"
+config.output = "output/"
 config.embedding_size = 512
 config.channels = (64, 128, 256)  # 各阶段通道数
 config.use_se = True
@@ -21,7 +21,7 @@ config.warmup_epoch = 1
 config.fp16 = True
 
 # 数据配置
-config.rec = "/ipcdata-tj/data/jinj/glint360k"
+config.rec = "/path/to/glint360k"
 config.num_classes = 360232
 config.num_image = 17091657
 config.num_workers = 2

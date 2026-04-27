@@ -4,13 +4,13 @@ config = edict()
 
 # 模型配置
 config.network = "femv2_se_mutant_a1"  # student
-config.output = "/ipcdata-bj/data/jinj/face_rec_train_result/femv2_se_mutant_a1_distill"
+config.output = "output/"
 config.embedding_size = 512
 
 # 蒸馏配置
 config.distill = True
 config.teacher_network = "r100"
-config.teacher_checkpoint = "/ipcdata-bj/data/jinj/face_rec_train_result/glint360k_r100/model.pt"
+config.teacher_checkpoint = "/path/to/teacher/model.pt"
 config.teacher_prune_ratio = None
 config.distill_alpha = 0.5
 config.distill_loss_type = "cosine"
@@ -27,7 +27,7 @@ config.warmup_epoch = 5
 config.fp16 = True
 
 # 数据配置
-config.rec = "/ipcdata-tj/data/jinj/glint360k"
+config.rec = "/path/to/glint360k"
 config.num_classes = 360232
 config.num_image = 17091657
 config.num_workers = 2
