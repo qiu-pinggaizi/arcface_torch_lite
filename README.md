@@ -5,26 +5,58 @@
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/killing-two-birds-with-one-stone-efficient/face-verification-on-agedb-30)](https://paperswithcode.com/sota/face-verification-on-agedb-30?p=killing-two-birds-with-one-stone-efficient)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/killing-two-birds-with-one-stone-efficient/face-verification-on-cfp-fp)](https://paperswithcode.com/sota/face-verification-on-cfp-fp?p=killing-two-birds-with-one-stone-efficient)
 
-> 基于 [InsightFace ArcFace Torch](https://github.com/deepinsight/insightface/tree/master/recognition/arcface_torch) 的增强版本。在保留原始全部能力的基础上，新增了**轻量化模型设计**、**知识蒸馏**和**结构化剪枝**的模型压缩流水线，面向边缘部署场景。
+> 基于 [InsightFace ArcFace Torch](https://github.com/deepinsight/insightface/tree/master/recognition/arcface_torch) 的增强版本。在保留原版全部能力的基础上，新增了**轻量化模型设计 (mbf_v3)**、**结构化剪枝**和**知识蒸馏**三项核心改进，构建了面向边缘部署的完整模型压缩流水线。
 
-## 与原版的关系
+## 核心改进
 
-本项目 fork 自 InsightFace 官方的 `arcface_torch`，保留了原版的全部功能：
+本项目在原版 ArcFace Torch 基础上做了三项主要改进：
 
-- 分布式训练 (多机多卡)、混合精度 (FP16)、PartialFC 大规模分类
-- iResNet / MobileFaceNet / ViT 等骨干网络
-- MS1MV2 / MS1MV3 / Glint360K / WebFace42M 等数据集支持
-- ONNX 导出、IJB-C 评估等工具链
+### 1. 轻量化模型 mbf_v3
 
-在此基础上，本项目**新增**了以下能力：
+原版的 MobileFaceNet 系列采用 MobileNetV2 风格的倒残差结构（1x1 卷积升维 → 3x3 深度卷积 → 1x1 卷积降维 + 残差连接）。`mbf_v3` 在此基础上，通过调整 `scale`（通道宽度倍率）和 `blocks`（各阶段残差块数量）两个核心参数，在保持相同架构的前提下实现模型轻量化：
 
-| 新增能力 | 入口文件 | 说明 |
-|----------|----------|------|
-| 轻量化骨干网络 | `backbones/mobilefacenet.py` | mbf_v3 (3.7M) / mbf_v3_se (3.9M) 等轻量变体 |
-| SE 注意力模块 | `backbones/modules/se_module.py` | Squeeze-and-Excitation 模块，可插入任意网络 |
-| 知识蒸馏训练 | `train_v2_distill.py` | Teacher-Student 蒸馏，支持 cosine/L2 embedding 蒸馏 |
-| 结构化剪枝 | `train_v2_prune.py` | 基于 GroupNormPruner 的通道剪枝 |
-| 蒸馏损失函数 | `losses_distill.py` | Embedding 级蒸馏损失 (cosine similarity / L2) |
+| 变体 | scale | blocks | 各阶段通道数 | 残差块总数 | 参数量 | 定位 |
+|------|-------|--------|-------------|-----------|--------|------|
+| `mbf` | 2 | (1,4,6,2) | 128→128→256→256 | 13 | ~1.0M | 原版超轻量 |
+| `mbf_large` | 4 | (2,8,12,4) | 256→256→512→512 | 26 | 6.30M | 原版大模型 |
+| **`mbf_v3`** | **3** | **(2,6,8,3)** | **192→192→384→384** | **19** | **3.71M** | **新增轻量化** |
+| `mbf_v3_se` | 3 | (2,6,8,3) | 192→192→384→384 | 19+SE | 3.86M | 新增+注意力 |
+
+`mbf_v3` 相比 `mbf_large`：
+- **通道宽度**: scale 4→3，减少 25%
+- **网络深度**: blocks 总数 26→19，减少 27%
+- **参数量**: 6.3M→3.7M，减少 **41%**
+- **架构不变**: 保持 MobileNetV2 倒残差 + 深度可分离卷积的设计
+
+`mbf_v3_se` 在 `mbf_v3` 基础上引入 SE (Squeeze-and-Excitation) 注意力模块，参数仅增加 4% (3.71M→3.86M)，用于在蒸馏阶段提升精度。
+
+### 2. 结构化剪枝
+
+基于 [Torch-Pruning](https://github.com/VainF/Torch-Pruning) 的 `GroupNormPruner`，对 `mbf_large` 进行通道级结构化剪枝：
+
+- 使用 L2 范数作为通道重要性指标
+- 保护 GDC 头部（`features`、`conv_sep`）不被剪枝
+- 25% 剪枝率下精度损失 < 1%
+
+### 3. 知识蒸馏
+
+从大模型 (Teacher) 向轻量化模型 (Student) 进行 Embedding 级蒸馏：
+
+- Teacher: `mbf_large` (6.3M) → Student: `mbf_v3_se` (3.9M)
+- 蒸馏损失: 余弦相似度 (cosine) 或 L2 范数
+- 总损失: `L = α * L_CE + (1-α) * L_distill`，α=0.5
+
+### 压缩流水线
+
+```
+mbf_large (6.3M, 1.86G FLOPs)        ← 原版大模型，作为 Teacher
+    │
+    ├─→ 结构化剪枝 (25%) ─→ 4.7M     ← 参数量 -25%，精度损失 < 1%
+    │
+    └─→ 知识蒸馏 ─→ mbf_v3_se (3.9M)  ← 参数量 -38%，由 Teacher 指导训练
+                        │
+                        └─→ ONNX 导出  ← 部署就绪
+```
 
 ## 项目结构
 
@@ -32,9 +64,9 @@
 arcface_torch/
 ├── backbones/                 # 骨干网络定义
 │   ├── iresnet.py             #   iResNet 系列 (原版)
-│   ├── mobilefacenet.py       #   MobileFaceNet 系列 (原版 + 新增轻量变体)
+│   ├── mobilefacenet.py       #   MobileFaceNet 系列 (原版 + 新增 mbf_v3/mbf_v3_se)
 │   ├── vit.py                 #   Vision Transformer (原版)
-│   └── modules/               #   子模块 (新增 SE 注意力等)
+│   └── modules/               #   子模块 (新增 SE 注意力)
 ├── configs/                   # 训练配置 (原版 + 新增)
 ├── eval/                      # 评估验证模块 (原版)
 ├── utils/                     # 工具函数 (原版)
@@ -52,37 +84,6 @@ arcface_torch/
 └── lr_scheduler.py           # 学习率调度器 (原版)
 ```
 
-## 轻量化模型压缩流水线
-
-本项目的核心价值在于提供了一套**从大模型到边缘部署的完整压缩流水线**：
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  Stage 1: 基线训练                                        │
-│  mbf_large (6.3M params, 1.86 GFLOPs)                    │
-│  → Glint360K, 90 epochs, PartialFC                       │
-├─────────────────────────────────────────────────────────┤
-│  Stage 2: 结构化剪枝                                      │
-│  GroupNormPruner, 25% channel pruning                    │
-│  → 4.7M params, 精度损失 < 1%                             │
-├─────────────────────────────────────────────────────────┤
-│  Stage 3: 知识蒸馏                                        │
-│  Teacher: mbf_large → Student: mbf_v3_se (3.9M)          │
-│  → Embedding cosine distillation + CE loss               │
-├─────────────────────────────────────────────────────────┤
-│  Stage 4: ONNX 导出                                       │
-│  → 部署就绪的 ONNX 模型                                   │
-└─────────────────────────────────────────────────────────┘
-```
-
-### 轻量化模型对比
-
-| 模型 | 参数量 | FLOPs | 相比 mbf_large | 说明 |
-|------|--------|-------|----------------|------|
-| `mbf_large` | 6.30M | 1.86G | baseline | 原版 MobileFaceNet Large |
-| `mbf_v3` | 3.71M | ~1.1G | **-41%** | scale=3, blocks=(2,6,8,3) |
-| `mbf_v3_se` | 3.86M | ~1.15G | **-39%** | mbf_v3 + SE 注意力 |
-
 ## 环境要求
 
 - Python >= 3.8
@@ -93,8 +94,7 @@ arcface_torch/
 
 ```bash
 pip install -r requirements.txt
-# 剪枝功能需要 torch-pruning
-pip install torch-pruning
+pip install torch-pruning  # 剪枝功能依赖
 ```
 
 ## 快速开始
@@ -113,17 +113,24 @@ torchrun --nproc_per_node=8 --nnodes=2 --node_rank=0 --master_addr="ip1" --maste
     train_v2.py configs/wf42m_pfc02_16gpus_r100
 ```
 
-### 轻量化模型训练 (新增)
+### mbf_v3 轻量化训练
 
 ```bash
-# mbf_v3 基线训练
+# mbf_v3 基线训练 (scale=3, blocks=(2,6,8,3))
 bash scripts/run_mbf_v3.sh
 
-# mbf_v3 + SE 注意力
+# mbf_v3 + SE 注意力模块
 bash scripts/run_mbf_v3_se.sh
 ```
 
-### 知识蒸馏 (新增)
+### 结构化剪枝
+
+```bash
+# mbf_large 25% 通道剪枝
+bash scripts/run.5max.sh
+```
+
+### 知识蒸馏
 
 ```bash
 # Teacher: mbf_large → Student: mbf_v3_se
@@ -131,13 +138,6 @@ bash scripts/run_mbf_v3_se_distill.sh
 
 # 带剪枝的蒸馏
 bash scripts/run_mbf_v3_se_distill_prune.sh
-```
-
-### 结构化剪枝 (新增)
-
-```bash
-# mbf_large 25% 通道剪枝
-bash scripts/run.5max.sh
 ```
 
 ### 推理与导出
@@ -174,7 +174,7 @@ python tools/eval_ijbc.py
 
 | 网络 | 说明 |
 |------|------|
-| `mbf_v3` | 轻量化 MobileFaceNet V3 (3.7M, scale=3) |
+| `mbf_v3` | 基于原版 MobileFaceNet 调整 scale/blocks 的轻量化版本 (3.7M) |
 | `mbf_v3_se` | mbf_v3 + SE 注意力模块 (3.9M) |
 
 ## 支持的数据集
