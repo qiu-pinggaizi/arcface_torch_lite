@@ -134,6 +134,21 @@ class DataLoaderX(DataLoader):
         self.preload()
         return batch
 
+    def next_item(self, index):
+        """Index-based batch access for multi-dataset synchronized iteration.
+        Resets the iterator when index == 0 (start of epoch).
+        """
+        if index == 0:
+            self.iter = super(DataLoaderX, self).__iter__()
+            self.iter = BackgroundGenerator(self.iter, self.local_rank)
+            self.preload()
+        torch.cuda.current_stream().wait_stream(self.stream)
+        batch = self.batch
+        if batch is None:
+            raise StopIteration
+        self.preload()
+        return batch
+
 
 class MXFaceDataset(Dataset):
     def __init__(self, root_dir, local_rank):

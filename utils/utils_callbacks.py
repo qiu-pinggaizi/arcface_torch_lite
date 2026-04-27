@@ -125,3 +125,34 @@ class CallBackLogging(object):
             else:
                 self.init = True
                 self.tic = time.time()
+
+    def self_callback_logging(self,
+                              data_id: int,
+                              global_step: int,
+                              loss: AverageMeter,
+                              epoch: int,
+                              fp16: bool,
+                              learning_rate: float,
+                              grad_scaler: torch.cuda.amp.GradScaler):
+        """Per-dataset loss logging for multi-dataset training."""
+        if self.rank == 0 and global_step > 0 and global_step % self.frequent == 0:
+            time_now = time.time()
+            time_sec = int(time_now - self.time_start)
+            time_sec_avg = time_sec / (global_step - self.start_step + 1)
+            eta_sec = time_sec_avg * (self.total_step - global_step - 1)
+            time_for_end = eta_sec / 3600
+            if self.writer is not None:
+                self.writer.add_scalar(
+                    f'loss_dataset_{data_id}', loss.avg, global_step)
+            if fp16:
+                msg = "data_id %d  Loss %.4f   LearningRate %.6f   Epoch: %d   Global Step: %d   " \
+                      "Fp16 Grad Scale: %2.f   Required: %1.f hours" % (
+                          data_id, loss.avg, learning_rate, epoch, global_step,
+                          grad_scaler.get_scale(), time_for_end)
+            else:
+                msg = "data_id %d  Loss %.4f   LearningRate %.6f   Epoch: %d   Global Step: %d   " \
+                      "Required: %1.f hours" % (
+                          data_id, loss.avg, learning_rate, epoch, global_step,
+                          time_for_end)
+            logging.info(msg)
+            loss.reset()
