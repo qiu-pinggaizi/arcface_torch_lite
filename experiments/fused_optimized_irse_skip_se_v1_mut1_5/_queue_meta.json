@@ -1,0 +1,7 @@
+{
+  "model_id": "fused_optimized_irse_skip_se_v1_mut1_5",
+  "strategy_type": "mutation",
+  "compiler_method": "llm-queue",
+  "enqueued_at": "2026-04-23T05:05:34",
+  "structure_fingerprint": "e3c59309d6971d7eda9c330e80791e06"
+}

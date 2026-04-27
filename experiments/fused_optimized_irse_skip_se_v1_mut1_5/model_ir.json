@@ -1,0 +1,280 @@
+{
+  "version": "4.0.0",
+  "metadata": {
+    "model_id": "fused_optimized_irse_skip_se_v1_mut1_5",
+    "task_type": "face_embedding",
+    "generation_method": "mutation",
+    "parent_models": [
+      "fused_optimized_ghost_ir_se_skipconnect_v2_mut1"
+    ],
+    "description": "基于父模型进行轻量化微调：降低ir5扩展比以减少中层计算冗余，移除末端ir6的SE模块以节省注意力开销，增大ir2的SE压缩比以平衡早期特征校准与参数量。在保持SkipConnect梯度流与HardSwish激活优势的前提下，进一步压低FLOPs与Params，提升综合得分。",
+    "mutation_log": [
+      {
+        "param": "ir5.expand_ratio",
+        "original": 4,
+        "new": 2,
+        "reason": "降低中层倒残差块扩展比，减少1x1卷积计算量与参数量，配合SkipConnect保持梯度流，提升综合效率。"
+      },
+      {
+        "param": "ir6.use_se",
+        "original": true,
+        "new": false,
+        "reason": "移除末端下采样块的SE模块，高层特征已具备强判别性，移除可节省注意力分支开销，降低FLOPs。"
+      },
+      {
+        "param": "ir2.se_reduction",
+        "original": 8,
+        "new": 16,
+        "reason": "增大早期SE模块的压缩比，减少SE分支参数量与计算量，在保持通道校准能力的同时进一步轻量化。"
+      }
+    ],
+    "source_llm": "Qwen3.6-Plus",
+    "source_worker": "MiMo-V2-omni",
+    "compiler_method": "llm-queue",
+    "ancestry": [
+      {
+        "model_id": "fused_optimized_ghost_ir_se_skipconnect_v2_mut1",
+        "depth": 1,
+        "generation_method": "mutation",
+        "accuracy": 0.9995588235294117,
+        "params": 279602,
+        "flops": 220862728,
+        "composite_score": 0.9997613651337646,
+        "changes_from_parent": "基于父模型进行小幅轻量化变异：在保持112x112灰度输入、256维L2归一化输出和整体FusedGhostIR主干不变的前提下，对中高层结构进行3处受限调整，以进一步压缩参数/FLOPs并尽量维持高判别力。",
+        "parent_id": "fused_skipconnect_hybrid_v2_crossover"
+      },
+      {
+        "model_id": "fused_skipconnect_hybrid_v2_crossover",
+        "depth": 2,
+        "generation_method": "crossover",
+        "accuracy": 0.9996323529411765,
+        "params": 338344,
+        "flops": 223366784,
+        "composite_score": 0.9997999373564707,
+        "changes_from_parent": "将 channel configuration 从 [40, 72, 128, 256] 改为 [40, 72, 128, 256]（继承父模型2的精简通道配置，已被验证在300K-400K参数内达到99.94%精度）; 将 stem output channels 从 32 or 40 改为 40（采用父模型2的stem设计，40通道stem配合后续轻量块可充分提取初始特征）; 将 SE distribution 从 SE in ir4 and ir6 (downsampling blocks) 改为 SE in ir4 and ir6 (downsampling blocks)（继承父模型2的分层SE策略，仅在下采样块启用SE注意力，有效减少参数开销同时保持判别力）; 将 expansion ratios 从 stem=4, ir1=2, ir2=2, ir3=2, ir4=2, ir5=4, ir6=2 改为 stem=4, ir1=2, ir2=2, ir3=2, ir4=2, ir5=4, ir6=2（采用父模型2验证的扩展比配置，在ir5使用exp=4增加特征容量，ir6使用exp=2+SE进行高效精炼）",
+        "parent_id": "fused_efficient_ir_se_hybrid_v1"
+      }
+    ],
+    "parent_metrics": [
+      {
+        "model_id": "fused_optimized_ghost_ir_se_skipconnect_v2_mut1",
+        "accuracy": 0.9995588235294117,
+        "params": 279602,
+        "flops": 220862728,
+        "composite_score": 0.9997613651337646
+      }
+    ]
+  },
+  "architecture": {
+    "input_shape": [
+      1,
+      112,
+      112
+    ],
+    "output_shape": [
+      256
+    ],
+    "backbone": {
+      "type": "MobileNetV2_SE_Skip",
+      "family": "mobilenet_v2",
+      "channels": [
+        40,
+        72,
+        128,
+        256
+      ],
+      "activation": "HardSwish",
+      "blocks_description": "精简6-block InvertedResidual_SE骨干：Stem(40) -> Stage1(40) -> Stage2(72) -> Stage3(128) -> Stage4(256)。融合父模型1的轻量化通道配置，父模型2/3的SkipConnect增强梯度流，选择性SE策略（仅下采样块启用SE）。ir5使用exp=2降低计算量，ir6移除SE，ir2增大SE压缩比。统一HardSwish激活，GDConv头部。",
+      "blocks": [
+        {
+          "name": "conv_stem",
+          "op": "Conv2d",
+          "params": {
+            "in_ch": 1,
+            "out_ch": 40,
+            "kernel": 3,
+            "stride": 2,
+            "padding": 1,
+            "bias": false
+          }
+        },
+        {
+          "name": "bn_stem",
+          "op": "BN",
+          "params": {
+            "num_features": 40
+          }
+        },
+        {
+          "name": "act_stem",
+          "op": "HardSwish",
+          "params": {}
+        },
+        {
+          "name": "ir1",
+          "op": "InvertedResidual_SE",
+          "params": {
+            "in_channels": 40,
+            "out_channels": 40,
+            "stride": 1,
+            "expand_ratio": 2,
+            "use_se": false,
+            "activation": "HardSwish"
+          }
+        },
+        {
+          "name": "ir2",
+          "op": "InvertedResidual_SE",
+          "params": {
+            "in_channels": 40,
+            "out_channels": 72,
+            "stride": 2,
+            "expand_ratio": 2,
+            "use_se": true,
+            "se_reduction": 16,
+            "activation": "HardSwish"
+          }
+        },
+        {
+          "name": "ir3",
+          "op": "InvertedResidual_SE",
+          "params": {
+            "in_channels": 72,
+            "out_channels": 72,
+            "stride": 1,
+            "expand_ratio": 2,
+            "use_se": false,
+            "activation": "HardSwish"
+          }
+        },
+        {
+          "name": "skip_after_stage2",
+          "op": "SkipConnect",
+          "params": {}
+        },
+        {
+          "name": "ir4",
+          "op": "InvertedResidual_SE",
+          "params": {
+            "in_channels": 72,
+            "out_channels": 128,
+            "stride": 2,
+            "expand_ratio": 2,
+            "use_se": true,
+            "se_reduction": 8,
+            "activation": "HardSwish"
+          }
+        },
+        {
+          "name": "ir5",
+          "op": "InvertedResidual_SE",
+          "params": {
+            "in_channels": 128,
+            "out_channels": 128,
+            "stride": 1,
+            "expand_ratio": 2,
+            "use_se": false,
+            "activation": "HardSwish"
+          }
+        },
+        {
+          "name": "skip_after_stage3",
+          "op": "SkipConnect",
+          "params": {}
+        },
+        {
+          "name": "ir6",
+          "op": "InvertedResidual_SE",
+          "params": {
+            "in_channels": 128,
+            "out_channels": 256,
+            "stride": 2,
+            "expand_ratio": 2,
+            "use_se": false,
+            "activation": "HardSwish"
+          }
+        }
+      ]
+    },
+    "head": {
+      "type": "gdconv",
+      "feat_dim": 256,
+      "blocks": [
+        {
+          "name": "gdconv",
+          "op": "Conv2d",
+          "params": {
+            "in_ch": 256,
+            "out_ch": 256,
+            "kernel": 7,
+            "stride": 1,
+            "padding": 0,
+            "groups": 256,
+            "bias": false
+          }
+        },
+        {
+          "name": "bn_head",
+          "op": "BN",
+          "params": {
+            "num_features": 256
+          }
+        },
+        {
+          "name": "flatten",
+          "op": "CompositeBlock",
+          "params": {
+            "definition": "nn.Flatten()"
+          }
+        },
+        {
+          "name": "l2_norm",
+          "op": "CompositeBlock",
+          "params": {
+            "definition": "nn.functional.normalize(p=2, dim=1)"
+          }
+        }
+      ]
+    }
+  },
+  "training_config": {
+    "optimizer": "AdamW",
+    "learning_rate": 0.001,
+    "weight_decay": 0.0005,
+    "batch_size": 64,
+    "epochs": 200,
+    "scheduler": "cosine",
+    "warmup_epochs": 5,
+    "early_stopping_patience": 50,
+    "loss": {
+      "type": "ArcFace",
+      "scale": 30.0,
+      "margin": 0.5
+    }
+  },
+  "constraints": {
+    "max_params": 1000000,
+    "reject_params": 1300000,
+    "max_flops": 700000000,
+    "reject_flops": 910000000,
+    "min_params": 500000,
+    "allowed_ops": [
+      "Conv2d",
+      "DWConv",
+      "BN",
+      "ReLU",
+      "ReLU6",
+      "HardSwish",
+      "SE",
+      "InvertedResidual_SE",
+      "SkipConnect",
+      "MaxPool",
+      "AvgPool",
+      "AdaptiveAvgPool",
+      "FC",
+      "Dropout",
+      "BN1d",
+      "CompositeBlock"
+    ]
+  }
+}

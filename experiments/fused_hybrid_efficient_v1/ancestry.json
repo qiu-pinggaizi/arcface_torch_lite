@@ -1,0 +1,95 @@
+{
+  "model_id": "fused_hybrid_efficient_v1",
+  "full_ancestry": [
+    {
+      "model_id": "fused_model_new",
+      "depth": 1,
+      "generation_method": "crossover",
+      "accuracy": 0.9990441176470588,
+      "params": 1967170,
+      "flops": 1156840448,
+      "composite_score": 0.9988977535445294,
+      "changes_from_parent": "将 channel_progression 从 ? 改为 ?（继承fused_model_v1的通道配置，平衡特征表示与参数量）; 将 activation_function 从 ? 改为 ?（使用更轻量的激活函数，降低计算复杂度）; 将 block_structure 从 ? 改为 ?（结合MobileNetV2的高效块结构与SE注意力，提升精度）; 将 head_type 从 ? 改为 ?（选择轻量级embedding head，减少参数量）",
+      "parent_id": "gen_iter009_07_variant"
+    },
+    {
+      "model_id": "gen_iter009_07_variant",
+      "depth": 2,
+      "generation_method": "mutation",
+      "accuracy": 0.9960340775558167,
+      "params": 975008,
+      "flops": 196681728,
+      "composite_score": 0.9978296121513515,
+      "changes_from_parent": "将 expand_ratio 从 2 改为 4（Increase model capacity by expanding ratio in a key transition block (128 to 256 channels) to potentially improve accuracy while staying within resource constraints.）; 将 activation 从 HardSwish 改为 ReLU6（Replace HardSwish with simpler ReLU6 activation in stem to reduce computational complexity and speed up inference on mobile devices.）; 将 use_se 从 True 改为 False（Remove SE module from one block to balance model complexity and reduce FLOPs, as all blocks currently use SE which may be redundant.）",
+      "parent_id": "fused_mobilenet_v2_se"
+    },
+    {
+      "model_id": "fused_mobilenet_v2_se",
+      "depth": 3,
+      "generation_method": "crossover",
+      "accuracy": 0.998970588235294,
+      "params": 1072064,
+      "flops": 1179267072,
+      "composite_score": 0.9988267565967057,
+      "changes_from_parent": "将 block_structure 从 ? 改为 ?（高效且满足FLOPs约束的块结构）; 将 se_attention 从 ? 改为 ?（在高层特征添加SE注意力增强判别性，补偿减少的块数量）; 将 activation_function 从 ? 改为 ?（移动端更高效的激活函数）; 将 head_type 从 ? 改为 ?（验证过的高精度head设计）; 将 channel_progression 从 ? 改为 ?（平衡的通道配置，最大通道256符合参数量约束）",
+      "parent_id": "hist_iter018_candidate_01"
+    },
+    {
+      "model_id": "fused_ghost_mobilenet_se_variant",
+      "depth": 1,
+      "generation_method": "mutation",
+      "accuracy": 0.9985294117647059,
+      "params": 911160,
+      "flops": 422798400,
+      "composite_score": 0.9989985090588234,
+      "changes_from_parent": "将stage3_ir_se_1的扩展比从6改为4，以降低计算量并保持性能; 将stage4_ghost_se_1的激活函数从ReLU6改为HardSwish，以提升非线性表达能力; 在stage5_ir_se_2后添加一个SkipConnect连接，以增强特征复用",
+      "parent_id": "fused_mobilenet_v2_se_variant_v2"
+    },
+    {
+      "model_id": "fused_mobilenet_v2_se_variant_v2",
+      "depth": 2,
+      "generation_method": "mutation",
+      "accuracy": 0.9987514688601645,
+      "params": 1104578,
+      "flops": 1234061824,
+      "composite_score": 0.9985347557737367,
+      "changes_from_parent": "将 channel_width 从 ? 改为 ?（降低初始通道数以显著减少参数量和FLOPs，满足约束条件）; 将 se_attention 从 ? 改为 ?（移除高层SE注意力以减少参数量和计算量，补偿通道宽度降低带来的精度损失风险）; 将 expansion_ratio 从 ? 改为 ?（降低最后一个块的扩展比以进一步减少计算量，同时保持块结构效率）",
+      "parent_id": "fused_model_v2"
+    },
+    {
+      "model_id": "fused_model_v2",
+      "depth": 3,
+      "generation_method": "crossover",
+      "accuracy": 0,
+      "params": 0,
+      "flops": 0,
+      "composite_score": 0,
+      "changes_from_parent": "将 channel_progression 从 ? 改为 ?（继承自精度最高（0.99897）且参数量最小的父模型，平衡了特征表达能力和计算效率。）; 将 se_attention 从 ? 改为 ?（在高层特征添加SE注意力以增强判别性，这是fused_model_v1的关键优势之一。）; 将 block_structure 从 ? 改为 ?（继承自高精度父模型的高效块结构，在参数量和精度间取得良好平衡。）; 将 activation_function 从 ? 改为 ?（继承自高精度父模型，是移动端更高效的激活函数。）; 将 head_type 从 ? 改为 ?（继承自高精度父模型，是经过验证的高精度头部设计。）; 将 training_config 从 ? 改为 ?（继承自精度最高的父模型，以确保训练稳定性和收敛性。）",
+      "parent_id": "subcenter_arcface"
+    },
+    {
+      "model_id": "subcenter_arcface",
+      "depth": 4,
+      "generation_method": "seed",
+      "accuracy": 0.998679480595701,
+      "params": 5927872,
+      "flops": 879120000,
+      "composite_score": 0.99854041912699,
+      "changes_from_parent": "Seed model: subcenter_arcface",
+      "parent_id": null
+    },
+    {
+      "model_id": "curricularface_small",
+      "depth": 1,
+      "generation_method": "seed",
+      "accuracy": 0.9984593940283177,
+      "params": 6636992,
+      "flops": 905170000,
+      "composite_score": 0.9982403017416183,
+      "changes_from_parent": "种子模型：curricularface_small (MobileNetV2 backbone, 256d embedding, 8 InvertedResidual blocks, expand_ratio=6 (first2 =1))",
+      "parent_id": null
+    }
+  ],
+  "max_depth": 4,
+  "generated_at": "2026-04-19T16:13:37"
+}

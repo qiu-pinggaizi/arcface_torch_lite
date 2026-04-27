@@ -1,0 +1,7 @@
+{
+  "model_id": "fused_hybrid_efficient_v1",
+  "strategy_type": "crossover",
+  "compiler_method": "llm-queue",
+  "enqueued_at": "2026-04-19T16:13:37",
+  "structure_fingerprint": "d94153ea2b142dea915ca43e4505d8c6"
+}

@@ -1,0 +1,62 @@
+{
+  "model_id": "fused_efficient_mobilenetv2_se_256d_mutant_a1",
+  "full_ancestry": [
+    {
+      "model_id": "fused_efficient_nir_face_v1",
+      "depth": 1,
+      "generation_method": "crossover",
+      "accuracy": 0.9980882352941177,
+      "params": 861344,
+      "flops": 222106240,
+      "composite_score": 0.9989311245835294,
+      "changes_from_parent": "将 ? 从 [64, 128, 256, 384] / [64, 96, 128, 192, 640] / [64, 128, 256, 512] 改为 [64, 96, 128, 192, 512]（融合fused_hybrid_ghost_mobilenet_v2_se_mutated的高效窄通道配置与fused_model_hist_ada的深层特征能力，最终stage采用512通道平衡表达能力与参数量。）; 将 ? 从 IR only / Ghost+IR hybrid / IR only 改为 IR_SE + GhostBlock_SE hybrid（继承fused_hybrid_ghost_mobilenet_v2_se_mutated的GhostBlock_SE轻量优势与fused_model_hist_ada的IR_SE块稳定性，在浅层使用GhostBlock_SE减少计算，深层使用IR_SE增强特征提取。）; 将 ? 从 gdconv / gap_fc_bn / gdconv 改为 gdconv（采用fused_model_hist_ada验证有效的GDConv头部，保留空间几何信息，更适合人脸特征提取任务。）; 将 ? 从 HardSwish / HardSwish / ReLU 改为 HardSwish（统一使用HardSwish激活，在轻量化网络中性能优于ReLU6/ReLU，已被两个高性能父模型验证。）; 将 ? 从 first block only / all stages / none 改为 stages 1, 2, 3 with SE; stage 4 without SE（在关键浅中层加入SE注意力增强特征 recalibration，深层省略SE控制FLOPs，参考fused_model_hist_ada的首块SE策略并扩展。）; 将 ? 从 Mixed 改为 From fused_hybrid_ghost_mobilenet_v2_se_mutated（继承最高综合得分父模型的训练配置（batch_size=64, epochs=200, early_stopping=50），更适合长周期稳定收敛。）",
+      "parent_id": "fused_ghost_mobilenet_se_variant"
+    },
+    {
+      "model_id": "fused_ghost_mobilenet_se_variant",
+      "depth": 2,
+      "generation_method": "mutation",
+      "accuracy": 0.9985294117647059,
+      "params": 911160,
+      "flops": 422798400,
+      "composite_score": 0.9989985090588234,
+      "changes_from_parent": "将stage3_ir_se_1的扩展比从6改为4，以降低计算量并保持性能; 将stage4_ghost_se_1的激活函数从ReLU6改为HardSwish，以提升非线性表达能力; 在stage5_ir_se_2后添加一个SkipConnect连接，以增强特征复用",
+      "parent_id": "fused_mobilenet_v2_se_variant_v2"
+    },
+    {
+      "model_id": "fused_mobilenet_v2_se_variant_v2",
+      "depth": 3,
+      "generation_method": "mutation",
+      "accuracy": 0.9987514688601645,
+      "params": 1104578,
+      "flops": 1234061824,
+      "composite_score": 0.9985347557737367,
+      "changes_from_parent": "将 channel_width 从 ? 改为 ?（降低初始通道数以显著减少参数量和FLOPs，满足约束条件）; 将 se_attention 从 ? 改为 ?（移除高层SE注意力以减少参数量和计算量，补偿通道宽度降低带来的精度损失风险）; 将 expansion_ratio 从 ? 改为 ?（降低最后一个块的扩展比以进一步减少计算量，同时保持块结构效率）",
+      "parent_id": "fused_model_v2"
+    },
+    {
+      "model_id": "fused_model_v2",
+      "depth": 4,
+      "generation_method": "crossover",
+      "accuracy": 0,
+      "params": 0,
+      "flops": 0,
+      "composite_score": 0,
+      "changes_from_parent": "将 channel_progression 从 ? 改为 ?（继承自精度最高（0.99897）且参数量最小的父模型，平衡了特征表达能力和计算效率。）; 将 se_attention 从 ? 改为 ?（在高层特征添加SE注意力以增强判别性，这是fused_model_v1的关键优势之一。）; 将 block_structure 从 ? 改为 ?（继承自高精度父模型的高效块结构，在参数量和精度间取得良好平衡。）; 将 activation_function 从 ? 改为 ?（继承自高精度父模型，是移动端更高效的激活函数。）; 将 head_type 从 ? 改为 ?（继承自高精度父模型，是经过验证的高精度头部设计。）; 将 training_config 从 ? 改为 ?（继承自精度最高的父模型，以确保训练稳定性和收敛性。）",
+      "parent_id": "subcenter_arcface"
+    },
+    {
+      "model_id": "subcenter_arcface",
+      "depth": 5,
+      "generation_method": "seed",
+      "accuracy": 0.998679480595701,
+      "params": 5927872,
+      "flops": 879120000,
+      "composite_score": 0.99854041912699,
+      "changes_from_parent": "Seed model: subcenter_arcface",
+      "parent_id": null
+    }
+  ],
+  "max_depth": 5,
+  "generated_at": "2026-04-20T10:27:35"
+}

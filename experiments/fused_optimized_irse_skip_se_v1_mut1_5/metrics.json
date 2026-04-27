@@ -1,0 +1,13 @@
+{
+  "accuracy": 0.9997058823529411,
+  "rank1": 99.97058823529412,
+  "error_rate": 0.0002941176470588891,
+  "params": 262088,
+  "flops": 195970688,
+  "error_rate_x_params": 77.08470588237013,
+  "error_rate_x_flops": 57638.437647071674,
+  "best_epoch": 85,
+  "epochs_trained": 135,
+  "training_time_seconds": 1227.7,
+  "composite_score": 0.9998454573374117
+}

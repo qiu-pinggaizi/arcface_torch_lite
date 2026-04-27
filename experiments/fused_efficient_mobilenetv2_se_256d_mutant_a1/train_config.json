@@ -1,0 +1,10 @@
+{
+  "optimizer": "AdamW",
+  "learning_rate": 0.001,
+  "weight_decay": 0.0001,
+  "batch_size": 64,
+  "epochs": 200,
+  "scheduler": "cosine",
+  "warmup_epochs": 5,
+  "early_stopping_patience": 50
+}

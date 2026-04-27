@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Training outputs
+*.pt
+*.pth
+*.onnx
+*.bin
+output/
+logs/
+tensorboard/
+wandb/
+
+# Data
+*.rec
+*.idx
+*.lst
+*.zip
+*.tar.gz
+*.tar
+
+# Models (large files)
+models/*.onnx
+models/*.pt
+models/*.pth
+
+# Experiment weights
+experiments/*/weights/
+
+# Temporary files
+*.tmp
+*.log
+*.bak
