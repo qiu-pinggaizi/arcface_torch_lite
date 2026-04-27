@@ -1,8 +1,9 @@
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+
 from ptflops import get_model_complexity_info
 from backbones import get_model
 import argparse
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
@@ -19,4 +20,3 @@ if __name__ == '__main__':
     if hasattr(net, "extra_gflops"):
         print("%.3f Extra-GFLOPs"%net.extra_gflops)
         print("%.3f Total-GFLOPs"%(gmacs+net.extra_gflops))
-

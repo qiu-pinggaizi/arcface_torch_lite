@@ -11,9 +11,6 @@ from utils.utils_config import get_config
 from utils.utils_callbacks import CallBackVerification
 
 import torch_pruning as tp
-from copy import deepcopy
-from thop import profile, clever_format
-
 import onnx
 
 

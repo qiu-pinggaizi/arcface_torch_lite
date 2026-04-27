@@ -15,17 +15,18 @@
 
 原版的 MobileFaceNet 系列采用 MobileNetV2 风格的倒残差结构（1x1 卷积升维 → 3x3 深度卷积 → 1x1 卷积降维 + 残差连接）。`mbf_v3` 在此基础上，通过调整 `scale`（通道宽度倍率）和 `blocks`（各阶段残差块数量）两个核心参数，在保持相同架构的前提下实现模型轻量化：
 
-| 变体 | scale | blocks | 各阶段通道数 | 残差块总数 | 参数量 | 定位 |
-|------|-------|--------|-------------|-----------|--------|------|
-| `mbf` | 2 | (1,4,6,2) | 128→128→256→256 | 13 | ~1.0M | 原版超轻量 |
-| `mbf_large` | 4 | (2,8,12,4) | 256→256→512→512 | 26 | 6.30M | 原版大模型 |
-| **`mbf_v3`** | **3** | **(2,6,8,3)** | **192→192→384→384** | **19** | **3.71M** | **新增轻量化** |
-| `mbf_v3_se` | 3 | (2,6,8,3) | 192→192→384→384 | 19+SE | 3.86M | 新增+注意力 |
+| 变体 | scale | blocks | 各阶段通道数 | 残差块总数 | 参数量 | FLOPs | 定位 |
+|------|-------|--------|-------------|-----------|--------|-------|------|
+| `mbf` | 2 | (1,4,6,2) | 128→128→256→256 | 13 | 2.05M | 0.45G | 原版超轻量 |
+| `mbf_large` | 4 | (2,8,12,4) | 256→256→512→512 | 26 | 6.30M | 1.85G | 原版大模型 |
+| **`mbf_v3`** | **3** | **(2,6,8,3)** | **192→192→384→384** | **19** | **3.71M** | **1.15G** | **新增轻量化** |
+| `mbf_v3_se` | 3 | (2,6,8,3) | 192→192→384→384 | 19+SE | 3.86M | 1.15G | 新增+注意力 |
 
 `mbf_v3` 相比 `mbf_large`：
 - **通道宽度**: scale 4→3，减少 25%
 - **网络深度**: blocks 总数 26→19，减少 27%
 - **参数量**: 6.3M→3.7M，减少 **41%**
+- **FLOPs**: 1.85G→1.15G，减少 **38%**
 - **架构不变**: 保持 MobileNetV2 倒残差 + 深度可分离卷积的设计
 
 `mbf_v3_se` 在 `mbf_v3` 基础上引入 SE (Squeeze-and-Excitation) 注意力模块，参数仅增加 4% (3.71M→3.86M)，用于在蒸馏阶段提升精度。
@@ -36,7 +37,7 @@
 
 - 使用 L2 范数作为通道重要性指标
 - 保护 GDC 头部（`features`、`conv_sep`）不被剪枝
-- 25% 剪枝率下精度损失 < 1%
+- 20% 剪枝率下精度损失 < 1%
 
 ### 3. 知识蒸馏
 
@@ -49,11 +50,11 @@
 ### 压缩流水线
 
 ```
-mbf_large (6.3M, 1.86G FLOPs)        ← 原版大模型，作为 Teacher
+mbf_large (6.3M, 1.85G)              ← 原版大模型，作为 Teacher
     │
-    ├─→ 结构化剪枝 (25%) ─→ 4.7M     ← 参数量 -25%，精度损失 < 1%
+    ├─→ 结构化剪枝 (20%) ─→ ~2.6M    ← 参数量 -32%，精度损失 < 1%
     │
-    └─→ 知识蒸馏 ─→ mbf_v3_se (3.9M)  ← 参数量 -38%，由 Teacher 指导训练
+    └─→ 知识蒸馏 ─→ mbf_v3_se (3.9M, 1.15G)  ← 参数量 -38%，由 Teacher 指导训练
                         │
                         └─→ ONNX 导出  ← 部署就绪
 ```
@@ -99,64 +100,120 @@ pip install torch-pruning  # 剪枝功能依赖
 
 ## 快速开始
 
-### 标准训练 (原版能力)
+### 数据集准备
 
-```bash
-# 单 GPU
-python train_v2.py configs/ms1mv3_r50_onegpu
+使用 Glint360K (360K 身份, 17.1M 图片) 训练，数据格式为 MXNet RecordIO (`train.rec`, `train.idx`)。
 
-# 8 GPU 分布式
-torchrun --nproc_per_node=8 train_v2.py configs/ms1mv3_r50
+修改配置文件中的数据集路径：
 
-# 多机分布式 (2 机 x 8 卡)
-torchrun --nproc_per_node=8 --nnodes=2 --node_rank=0 --master_addr="ip1" --master_port=12581 \
-    train_v2.py configs/wf42m_pfc02_16gpus_r100
+```python
+config.rec = "/path/to/glint360k"
+config.num_classes = 360232
+config.num_image = 17091657
 ```
 
-### mbf_v3 轻量化训练
+### 轻量化实验流水线
+
+以下为完整的轻量化实验步骤，基于 Glint360K 数据集，4 GPU 训练：
+
+#### Step 1: ResNet-100 基线 (参考)
 
 ```bash
-# mbf_v3 基线训练 (scale=3, blocks=(2,6,8,3))
-bash scripts/run_mbf_v3.sh
+# 4 GPU 训练 ResNet-100 基线模型
+CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --nproc_per_node=4 train_v2.py \
+    --config configs/glint360k_r100.py
+```
 
-# mbf_v3 + SE 注意力模块
+> ResNet-100 (63M, 250MB) 作为大模型精度天花板参考。
+
+#### Step 2: mbf_v3 基线训练
+
+```bash
+# Phase 1: mbf_v3 轻量化基线 (3.7M, scale=3, blocks=(2,6,8,3))
+bash scripts/run_mbf_v3.sh
+```
+
+实际执行命令：
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --master_port 29522 --nproc_per_node=4 \
+    train_v2_prune.py --config configs/glint360k_mbf_v3.py
+```
+
+#### Step 3: mbf_v3 + SE 注意力
+
+```bash
+# Phase 2: mbf_v3_se 增加 SE 注意力模块 (3.9M)
 bash scripts/run_mbf_v3_se.sh
 ```
 
-### 结构化剪枝
+实际执行命令：
 
 ```bash
-# mbf_large 25% 通道剪枝
-bash scripts/run.5max.sh
+CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --master_port 29523 --nproc_per_node=4 \
+    train_v2_prune.py --config configs/glint360k_mbf_v3_se.py
 ```
 
-### 知识蒸馏
+#### Step 4: 知识蒸馏
 
 ```bash
-# Teacher: mbf_large → Student: mbf_v3_se
+# Phase 3: Teacher(mbf_large) → Student(mbf_v3_se), cosine 蒸馏
 bash scripts/run_mbf_v3_se_distill.sh
+```
 
-# 带剪枝的蒸馏
+实际执行命令：
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --master_port 29524 --nproc_per_node=4 \
+    train_v2_distill.py --config configs/glint360k_mbf_v3_se_distill.py
+```
+
+#### Step 5: 蒸馏 + 通道剪枝
+
+```bash
+# Phase 3+: 蒸馏同时进行 20% 通道剪枝
 bash scripts/run_mbf_v3_se_distill_prune.sh
 ```
 
-### 推理与导出
+实际执行命令：
 
 ```bash
-# 模型推理
-python tools/inference.py --weight model.pt --network mbf_v3_se --img test.jpg
+CUDA_VISIBLE_DEVICES=4,5,6,7 torchrun --master_port 29526 --nproc_per_node=4 \
+    train_v2_distill.py --config configs/glint360k_mbf_v3_se_distill_prune.py \
+    --prune_ratio 0.2
+```
 
-# 模型验证
-python tools/inference_val.py --config configs/glint360k_mbf_v3_se.py --network mbf_v3_se --weight model.pt
+### 模型验证与导出
 
-# ONNX 导出
-python tools/torch2onnx.py
+```bash
+# 标准模型验证
+CUDA_VISIBLE_DEVICES=0 python tools/inference_val.py \
+    --config configs/glint360k_mbf_v3_se.py \
+    --network mbf_v3_se \
+    --weight /path/to/model.pt
+
+# 剪枝模型验证
+CUDA_VISIBLE_DEVICES=0 python tools/inference_val_prune.py \
+    --config configs/glint360k_mbf_v3_se.py \
+    --network mbf_v3_se \
+    --weight /path/to/pruned/model.pt \
+    --prune_ratio 0.2
+
+# 剪枝模型验证并导出 ONNX
+CUDA_VISIBLE_DEVICES=0 python tools/inference_val_prune.py \
+    --config configs/glint360k_mbf_v3_se.py \
+    --network mbf_v3_se \
+    --weight /path/to/pruned/model.pt \
+    --prune_ratio 0.2 --onnx
+
+# 标准 ONNX 导出
+python tools/torch2onnx.py \
+    --input /path/to/model.pt \
+    --output /path/to/model.onnx \
+    --network mbf_v3_se
 
 # 模型复杂度分析
 python tools/flops.py mbf_v3_se
-
-# IJB-C 评估
-python tools/eval_ijbc.py
 ```
 
 ## 支持的骨干网络
@@ -166,7 +223,7 @@ python tools/eval_ijbc.py
 | 网络 | 说明 |
 |------|------|
 | `r18` / `r34` / `r50` / `r100` / `r200` | iResNet 系列 |
-| `mbf` | MobileFaceNet (0.45G FLOPs) |
+| `mbf` | MobileFaceNet (2.05M, 0.45G) |
 | `mbf_large` | MobileFaceNet Large (6.3M) |
 | `vit_t` / `vit_s` / `vit_b` / `vit_l` / `vit_h` | Vision Transformer 系列 |
 
@@ -221,63 +278,28 @@ config.distill_loss_type = "cosine" # cosine / l2
 
 ---
 
-## 原版性能基准
+## 实验结果
 
-> 以下数据来自 InsightFace 原版项目。
+> 训练数据集: Glint360K (360K 身份, 17.1M 图片)，验证集: 7 个 benchmark。
 
-### Single-Host GPU
+### 轻量化流水线对比
 
-| Datasets       | Backbone            | **MFR-ALL** | IJB-C(1E-4) | IJB-C(1E-5) |
-|:---------------|:--------------------|:------------|:------------|:------------|
-| MS1MV2         | mobilefacenet-0.45G | 62.07       | 93.61       | 90.28       |
-| MS1MV2         | r50                 | 75.13       | 95.97       | 94.07       |
-| MS1MV2         | r100                | 78.12       | 96.37       | 94.27       |
-| MS1MV3         | r50                 | 79.14       | 96.37       | 94.47       |
-| MS1MV3         | r100                | 81.97       | 96.85       | 95.02       |
-| Glint360K      | r50                 | 86.34       | 97.16       | 95.81       |
-| Glint360K      | r100                | 89.52       | 97.55       | 96.38       |
-| WF4M           | r100                | 89.87       | 97.19       | 95.48       |
-| WF12M-PFC-0.2  | r100                | 94.75       | 97.60       | 95.90       |
-| WF42M-PFC-0.2  | r100                | 96.27       | 97.70       | 96.31       |
-| WF42M-PFC-0.3  | ViT-B-11G           | 97.16       | 97.91       | 97.05       |
+| 阶段 | 模型 | 参数量 | 体积 | LFW | VGG2_FP | AgeDB_30 | CALFW | CFP_FF | CPLFW | CFP_FP |
+|------|------|--------|------|-----|---------|----------|-------|--------|-------|--------|
+| 参考基线 | ResNet-100 | 63M | 250MB | 99.82% | 96.02% | 98.77% | 96.05% | 99.84% | 94.85% | 99.27% |
+| Phase 1 | mbf_v3 | 3.7M | 15MB | 99.78% | 95.54% | 97.83% | 96.03% | 99.89% | 93.43% | 98.44% |
+| Phase 2 | mbf_v3_se | 3.9M | 16MB | 99.83% | 95.76% | 98.05% | 96.10% | 99.91% | 93.52% | 98.71% |
+| Phase 3 | 蒸馏 | 3.9M | 16MB | 99.83% | 95.64% | 97.93% | 96.13% | 99.87% | 93.53% | 98.64% |
+| Phase 3+ | 蒸馏+剪枝 | 2.6M | 11MB | 99.82% | 95.52% | 97.80% | 96.02% | 99.86% | 93.00% | 98.26% |
 
-### Multi-Host GPU
+### 关键发现
 
-| Datasets         | Backbone(bs*gpus) | **MFR-ALL** | IJB-C(1E-4) | IJB-C(1E-5) |
-|:-----------------|:------------------|:------------|:------------|:------------|
-| WF42M-PFC-0.2    | r50(512*16)       | 93.96       | 97.46       | 96.12       |
-| WF42M-PFC-0.2    | r100(256*16)      | 96.69       | 97.85       | 96.63       |
+1. **mbf_v3 参数量 -41%** (6.3M→3.7M)，LFW 仅降 0.09%，scale/blocks 调整策略有效
+2. **SE 模块代价 +4% 参数**，7 个验证集平均 +0.13%，性价比高
+3. **20% 通道剪枝体积 -32%** (16MB→11MB)，精度仅降 0.01%~0.53%
+4. **最终模型 mbf_v3_se_distill_prune**: 11MB / LFW 99.82%，相比 ResNet-100 (250MB) 体积减少 **96%**，LFW 仅低 0.01%
 
-### ViT For Face Recognition
-
-| Datasets      | Backbone(bs)  | FLOPs | **MFR-ALL** | IJB-C(1E-4) | IJB-C(1E-5) |
-|:--------------|:--------------|:------|:------------|:------------|:------------|
-| WF42M-PFC-0.3 | VIT-T(384*64) | 1.5   | 92.24       | 97.31       | 95.97       |
-| WF42M-PFC-0.3 | VIT-S(384*64) | 5.7   | 95.87       | 97.73       | 96.57       |
-| WF42M-PFC-0.3 | VIT-B(384*64) | 11.4  | 97.42       | 97.90       | 97.04       |
-| WF42M-PFC-0.3 | VIT-L(384*64) | 25.3  | 97.85       | 98.00       | 97.23       |
-
-### Speed Benchmark
-
-> Training Speed (Samples/sec) on Tesla V100 32GB x 8
-
-| Number of Identities | Data Parallel | Model Parallel | Partial FC 0.1 |
-|:---------------------|:--------------|:---------------|:---------------|
-| 125,000              | 4681          | 4824           | 5004           |
-| 1,400,000            | 1672          | 3043           | 4738           |
-| 5,500,000            | -             | 1389           | 3975           |
-| 16,000,000           | -             | -              | 2679           |
-| 29,000,000           | -             | -              | 1855           |
-
-## 文档
-
-- [安装指南](docs/install.md)
-- [DALI 安装](docs/install_dali.md)
-- [模型库](docs/modelzoo.md)
-- [速度基准](docs/speed_benchmark.md)
-- [自定义数据集](docs/prepare_custom_dataset.md)
-- [WebFace42M 准备](docs/prepare_webface42m.md)
-- [评估方法](docs/eval.md)
+> 详细实验报告见 [docs/lightweight_experiment_report.md](docs/lightweight_experiment_report.md)
 
 ## 参考文献
 

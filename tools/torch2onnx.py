@@ -1,3 +1,6 @@
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+
 import numpy as np
 import onnx
 import torch
@@ -5,8 +8,8 @@ import torch
 
 def convert_onnx(net, path_module, output, opset=11, simplify=False):
     assert isinstance(net, torch.nn.Module)
-    img = np.random.randint(0, 255, size=(112, 112, 3), dtype=np.int32)
-    img = img.astype(float)
+    img = np.random.randint(0, 255, size=(112, 112, 3), dtype=np.uint8)
+    img = img.astype(np.float32)
     img = (img / 255. - 0.5) / 0.5  # torch style norm
     img = img.transpose((2, 0, 1))
     img = torch.from_numpy(img).unsqueeze(0).float()
@@ -37,7 +40,7 @@ if __name__ == '__main__':
     parser.add_argument('--input', type=str, default="/path/to/model.pt", help='input backbone.pth file or path')
     parser.add_argument('--output', type=str, default=None, help='output onnx path')
     parser.add_argument('--network', type=str, default="mbf_large_v2", help='backbone network')
-    parser.add_argument('--simplify', type=bool, default=False, help='onnx simplify')
+    parser.add_argument('--simplify', action='store_true', default=False, help='onnx simplify')
     args = parser.parse_args()
     input_file = args.input
     if os.path.isdir(input_file):
