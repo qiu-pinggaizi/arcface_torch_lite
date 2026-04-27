@@ -1,3 +1,6 @@
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+
 import numpy as np
 import onnx
 import torch
@@ -88,7 +91,8 @@ if __name__ == '__main__':
     parser.add_argument('-i','--input', type=str, default="/path/to/model.pt", help='input backbone.pth file or path')
     parser.add_argument('-o','--output', type=str, default=None, help='output onnx path')
     parser.add_argument('--network', type=str, default="mbf_large", help='backbone network')
-    parser.add_argument('--simplify', type=bool, default=True, help='onnx simplify')
+    parser.add_argument('--simplify', action='store_true', default=True, help='onnx simplify')
+    parser.add_argument('--no-simplify', dest='simplify', action='store_false', help='disable onnx simplify')
     args = parser.parse_args()
     input_file = args.input
     if os.path.isdir(input_file):
@@ -102,7 +106,7 @@ if __name__ == '__main__':
     assert args.network is not None
     print(args)
     backbone_onnx = get_model(args.network, dropout=0.0, fp16=False, num_features=512)
-    assert os.path.isdir(args.output), args.output + "is not dir"
+    assert os.path.isdir(args.output), args.output + " is not a directory"
     
     prune_rate_dict = {
         10:[10, 9, 8, 7, 6],

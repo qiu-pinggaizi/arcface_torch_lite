@@ -5,7 +5,7 @@
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/killing-two-birds-with-one-stone-efficient/face-verification-on-agedb-30)](https://paperswithcode.com/sota/face-verification-on-agedb-30?p=killing-two-birds-with-one-stone-efficient)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/killing-two-birds-with-one-stone-efficient/face-verification-on-cfp-fp)](https://paperswithcode.com/sota/face-verification-on-cfp-fp?p=killing-two-birds-with-one-stone-efficient)
 
-> 基于 [InsightFace ArcFace Torch](https://github.com/deepinsight/insightface/tree/master/recognition/arcface_torch) 的增强版本。在保留原始全部能力的基础上，新增了**轻量化模型设计**、**知识蒸馏**、**结构化剪枝**和**QAT 量化**的完整模型压缩流水线，面向边缘部署场景。
+> 基于 [InsightFace ArcFace Torch](https://github.com/deepinsight/insightface/tree/master/recognition/arcface_torch) 的增强版本。在保留原始全部能力的基础上，新增了**轻量化模型设计**、**知识蒸馏**和**结构化剪枝**的模型压缩流水线，面向边缘部署场景。
 
 ## 与原版的关系
 
@@ -22,10 +22,8 @@
 |----------|----------|------|
 | 轻量化骨干网络 | `backbones/mobilefacenet.py` | mbf_v3 (3.7M) / mbf_v3_se (3.9M) 等轻量变体 |
 | SE 注意力模块 | `backbones/modules/se_module.py` | Squeeze-and-Excitation 模块，可插入任意网络 |
-| NAS 融合架构 | `backbones/fused_*.py` | 神经架构搜索得到的自定义网络 |
 | 知识蒸馏训练 | `train_v2_distill.py` | Teacher-Student 蒸馏，支持 cosine/L2 embedding 蒸馏 |
 | 结构化剪枝 | `train_v2_prune.py` | 基于 GroupNormPruner 的通道剪枝 |
-| QAT 量化训练 | `train_v2_qat.py` | INT8 量化感知训练 |
 | 蒸馏损失函数 | `losses_distill.py` | Embedding 级蒸馏损失 (cosine similarity / L2) |
 
 ## 项目结构
@@ -36,20 +34,17 @@ arcface_torch/
 │   ├── iresnet.py             #   iResNet 系列 (原版)
 │   ├── mobilefacenet.py       #   MobileFaceNet 系列 (原版 + 新增轻量变体)
 │   ├── vit.py                 #   Vision Transformer (原版)
-│   ├── fused_*.py             #   NAS 搜索得到的融合架构 (新增)
 │   └── modules/               #   子模块 (新增 SE 注意力等)
 ├── configs/                   # 训练配置 (原版 + 新增)
 ├── eval/                      # 评估验证模块 (原版)
 ├── utils/                     # 工具函数 (原版)
 ├── scripts/                   # 训练和数据处理脚本
 ├── tools/                     # 推理、导出和评估工具
-├── experiments/               # NAS 实验归档 (新增)
 ├── docs/                      # 文档 (原版)
 │
 ├── train_v2.py               # 标准训练 (原版)
 ├── train_v2_distill.py       # 知识蒸馏训练 (新增)
 ├── train_v2_prune.py         # 剪枝训练 (新增)
-├── train_v2_qat.py           # QAT 量化训练 (新增)
 ├── dataset.py                # 数据加载 (原版)
 ├── losses.py                 # ArcFace/CosFace 损失 (原版)
 ├── losses_distill.py         # 蒸馏损失 (新增)
@@ -75,12 +70,8 @@ arcface_torch/
 │  Teacher: mbf_large → Student: mbf_v3_se (3.9M)          │
 │  → Embedding cosine distillation + CE loss               │
 ├─────────────────────────────────────────────────────────┤
-│  Stage 4: QAT INT8 量化                                   │
-│  PyTorch FX GraphMode Quantization                       │
-│  → 模型体积 ~0.9MB, CPU 推理 < 10ms                       │
-├─────────────────────────────────────────────────────────┤
-│  Stage 5: ONNX 导出                                       │
-│  → 部署就绪的量化 ONNX 模型                                │
+│  Stage 4: ONNX 导出                                       │
+│  → 部署就绪的 ONNX 模型                                   │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -91,9 +82,6 @@ arcface_torch/
 | `mbf_large` | 6.30M | 1.86G | baseline | 原版 MobileFaceNet Large |
 | `mbf_v3` | 3.71M | ~1.1G | **-41%** | scale=3, blocks=(2,6,8,3) |
 | `mbf_v3_se` | 3.86M | ~1.15G | **-39%** | mbf_v3 + SE 注意力 |
-| `fused_mbn_v2_se` | - | - | - | NAS 搜索的融合 MobileNetV2+SE |
-| `femv2_se_mutant_a1` | - | - | - | NAS 搜索的高效 MobileNetV2 SE |
-| `irse_skip_se_v1_mut1_5` | - | - | - | NAS 搜索的 IR-SE 跳跃连接架构 |
 
 ## 环境要求
 
@@ -152,13 +140,6 @@ bash scripts/run_mbf_v3_se_distill_prune.sh
 bash scripts/run.5max.sh
 ```
 
-### QAT 量化训练 (新增)
-
-```bash
-# 从蒸馏模型继续 QAT
-bash scripts/run_mbf_v3_se_qat.sh
-```
-
 ### 推理与导出
 
 ```bash
@@ -195,10 +176,6 @@ python tools/eval_ijbc.py
 |------|------|
 | `mbf_v3` | 轻量化 MobileFaceNet V3 (3.7M, scale=3) |
 | `mbf_v3_se` | mbf_v3 + SE 注意力模块 (3.9M) |
-| `mbf_v3_se_qat` | mbf_v3_se 的 QAT 量化版本 |
-| `fused_mbn_v2_se` | NAS 融合 MobileNetV2 + SE |
-| `femv2_se_mutant_a1` | NAS 高效 MobileNetV2 SE 变体 |
-| `irse_skip_se_v1_mut1_5` | NAS IR-SE 跳跃连接架构 |
 
 ## 支持的数据集
 

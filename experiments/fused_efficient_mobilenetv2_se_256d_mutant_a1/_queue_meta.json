@@ -1,7 +1,0 @@
-{
-  "model_id": "fused_efficient_mobilenetv2_se_256d_mutant_a1",
-  "strategy_type": "mutation",
-  "compiler_method": "llm-queue",
-  "enqueued_at": "2026-04-20T10:27:35",
-  "structure_fingerprint": "311294e9bd2d2699e30212b3a32e255a"
-}
