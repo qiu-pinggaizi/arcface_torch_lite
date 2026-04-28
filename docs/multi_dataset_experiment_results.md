@@ -1,24 +1,24 @@
-# Multi-Dataset Training Experiment Results
+# 多数据集训练实验结果
 
-## Experiment Setup
+## 实验配置
 
-- **Backbone**: mbf_v3_se (MobileFaceNet V3 with SE modules)
-- **Datasets**: glint360k (360,232 classes) + faces_umd (8,277 classes)
-- **Loss weights**: glint360k 0.7, faces_umd 0.3
-- **Optimizer**: SGD (lr=0.1, momentum=0.9, weight_decay=1e-4)
-- **Batch size**: 128 per dataset per GPU x 4 GPUs
-- **Gradient accumulation**: 4 steps (effective batch = 128 x 2 x 4 x 4 = 8,192)
-- **PartialFC sample_rate**: 0.9
-- **Epochs**: 10
-- **Validation**: LFW, CFP-FP, AgeDB-30 (every 2000 steps)
+- **骨干网络**: mbf_v3_se (带 SE 注意力的 MobileFaceNet V3)
+- **数据集**: glint360k (360,232 类) + faces_umd (8,277 类)
+- **损失权重**: glint360k 0.7, faces_umd 0.3
+- **优化器**: SGD (lr=0.1, momentum=0.9, weight_decay=1e-4)
+- **批大小**: 每数据集每 GPU 128，共 4 GPU
+- **梯度累积**: 4 步 (有效批大小 = 128 x 2 x 4 x 4 = 8,192)
+- **PartialFC 采样率**: 0.9
+- **训练轮数**: 10
+- **验证集**: LFW, CFP-FP, AgeDB-30 (每 2000 步验证一次)
 
-## Experiment 1: Multi-Dataset Baseline
+## 实验一：多数据集基线
 
-Training script: `train_multi_data.py`
-Config: `configs/glint360k_facesumd_r50_multi.py`
-Status: Training interrupted at Epoch 8 (Step ~298,640) by system, no code errors
+训练脚本: `train_multi_data.py`
+配置文件: `configs/glint360k_facesumd_r50_multi.py`
+状态: 训练在 Epoch 8 (Step ~298,640) 被系统终止，无代码错误
 
-### Verification Results (Accuracy-Flip)
+### 验证结果 (Accuracy-Flip)
 
 | Step | LFW | CFP-FP | AgeDB-30 |
 |------|-----|--------|----------|
@@ -34,21 +34,21 @@ Status: Training interrupted at Epoch 8 (Step ~298,640) by system, no code error
 | 200,000 | 99.73% | 97.39% | 96.83% |
 | 298,000 | 99.77% | 97.64% | 97.22% |
 
-**Best results**: LFW 99.77%, CFP-FP 97.64%, AgeDB-30 97.22%
+**最佳结果**: LFW 99.77%, CFP-FP 97.64%, AgeDB-30 97.22%
 
 ---
 
-## Experiment 2: Multi-Dataset + Knowledge Distillation
+## 实验二：多数据集 + 知识蒸馏
 
-Training script: `train_multi_data_distill.py`
-Config: `configs/glint360k_facesumd_mbf_v3_se_distill_multi.py`
-Status: Training interrupted at Epoch 4 (Step ~163,240) by system, no code errors
+训练脚本: `train_multi_data_distill.py`
+配置文件: `configs/glint360k_facesumd_mbf_v3_se_distill_multi.py`
+状态: 训练在 Epoch 4 (Step ~163,240) 被系统终止，无代码错误
 
-- **Teacher**: ResNet-100 (frozen, pretrained on glint360k)
-- **Distillation type**: cosine similarity on L2-normalized embeddings
-- **Distillation alpha**: 0.5 (CE weight = 0.5, distill weight = 0.5)
+- **Teacher**: ResNet-100 (冻结，预训练于 glint360k)
+- **蒸馏类型**: L2 归一化后的余弦相似度
+- **蒸馏 alpha**: 0.5 (CE 权重 = 0.5，蒸馏权重 = 0.5)
 
-### Verification Results (Accuracy-Flip)
+### 验证结果 (Accuracy-Flip)
 
 | Step | LFW | CFP-FP | AgeDB-30 |
 |------|-----|--------|----------|
@@ -63,27 +63,27 @@ Status: Training interrupted at Epoch 4 (Step ~163,240) by system, no code error
 | 100,000 | 99.62% | 96.36% | 96.33% |
 | 162,000 | 99.72% | 97.09% | 97.33% |
 
-**Best results**: LFW 99.73%, CFP-FP 97.20%, AgeDB-30 97.35%
+**最佳结果**: LFW 99.73%, CFP-FP 97.20%, AgeDB-30 97.35%
 
 ---
 
-## Comparison Summary
+## 对比总结
 
-| Benchmark | Baseline (298k steps) | Distill (162k steps) | Note |
-|-----------|----------------------|---------------------|------|
-| LFW | **99.77%** | 99.73% | Baseline slightly higher |
-| CFP-FP | **97.64%** | 97.20% | Baseline slightly higher |
-| AgeDB-30 | 97.22% | **97.35%** | Distill higher |
+| 验证集 | 基线 (298k steps) | 蒸馏 (162k steps) | 对比 |
+|--------|-------------------|-------------------|------|
+| LFW | **99.77%** | 99.73% | 基线略高 |
+| CFP-FP | **97.64%** | 97.20% | 基线略高 |
+| AgeDB-30 | 97.22% | **97.35%** | 蒸馏更高 |
 
-### Key Observations
+### 关键发现
 
-1. **Distillation shows advantage on harder tasks**: AgeDB-30 (age variation) is the hardest benchmark, and distillation achieves higher accuracy (97.35% vs 97.22%)
-2. **Training efficiency**: Distillation reaches comparable performance in fewer steps (~162k vs ~298k), though each step is ~2x slower due to teacher forward pass
-3. **Code correctness verified**: Both experiments run without errors, loss converges properly, and verification metrics improve as expected
-4. **Gradient clipping fix**: Both experiments use consistent gradient clipping that includes PartialFC parameters
+1. **蒸馏在难任务上更有优势**: AgeDB-30 (年龄变化) 是最具挑战性的验证集，蒸馏达到 97.35%，超过基线的 97.22%
+2. **训练效率**: 蒸馏在更少的 step (162k vs 298k) 就达到了可比的性能，尽管每步因 Teacher 前向传播慢约 2x
+3. **代码正确性验证**: 两个实验均无代码错误，损失正常收敛，验证指标符合预期
+4. **梯度裁剪修复**: 两个实验都使用了包含 PartialFC 参数的一致梯度裁剪策略
 
-## Bug Fixes Applied During This Experiment
+## 本次实验修复的 Bug
 
-1. **L2 normalization in distillation loss** (`losses_distill.py`): Moved `F.normalize()` before the loss type branch so both cosine and L2 loss types use normalized embeddings
-2. **Gradient clipping** (`train_multi_data.py`): Added PartialFC parameters to gradient clipping alongside backbone parameters
-3. **Config alignment**: Ensured both experiments use identical hyperparameters (sample_rate=0.9, gradient_acc=4, warmup_epoch=0, num_epoch=10)
+1. **蒸馏损失 L2 归一化** (`losses_distill.py`): 将 `F.normalize()` 移到损失类型分支外，cosine 和 l2 损失都使用归一化后的 embedding
+2. **梯度裁剪** (`train_multi_data.py`): 梯度裁剪包含 PartialFC 参数，与蒸馏脚本保持一致
+3. **配置对齐**: 确保两个实验使用相同的超参数 (sample_rate=0.9, gradient_acc=4, warmup_epoch=0, num_epoch=10)
