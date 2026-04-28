@@ -28,12 +28,14 @@ class EmbeddingDistillationLoss(nn.Module):
             loss: 总损失
             distill_loss_val: 蒸馏损失值 (用于日志)
         """
+        # L2 归一化
+        student_norm = F.normalize(student_emb, p=2, dim=1)
+        teacher_norm = F.normalize(teacher_emb, p=2, dim=1)
+        
         if self.loss_type == "cosine":
-            cos_sim = F.cosine_similarity(student_emb, teacher_emb, dim=1)
+            cos_sim = F.cosine_similarity(student_norm, teacher_norm, dim=1)
             distill_loss = (1 - cos_sim).mean()
         elif self.loss_type == "l2":
-            student_norm = F.normalize(student_emb, p=2, dim=1)
-            teacher_norm = F.normalize(teacher_emb, p=2, dim=1)
             distill_loss = F.mse_loss(student_norm, teacher_norm)
         else:
             raise ValueError(f"Unsupported loss_type: {self.loss_type}")
