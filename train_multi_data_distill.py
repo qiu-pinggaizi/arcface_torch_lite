@@ -8,6 +8,7 @@ import torch
 from backbones import get_model
 from dataset import get_dataloader
 from losses import CombinedMarginLoss
+from losses_distill import EmbeddingDistillationLoss
 from lr_scheduler import PolynomialLRWarmup
 from partial_fc_v2 import PartialFC_V2
 from torch import distributed
@@ -99,9 +100,34 @@ def main(args):
         )
         train_loader_dict[i] = train_loader
 
-    # === Backbone (shared) ===
+    # === Backbone (shared, student) ===
     backbone = get_model(
         cfg.network, dropout=0.0, fp16=cfg.fp16, num_features=cfg.embedding_size).cuda()
+
+    # === Teacher model (frozen) ===
+    teacher_model = None
+    distill_criterion = None
+    if hasattr(cfg, 'distill') and cfg.distill:
+        logging.info(f"Loading teacher model: {cfg.teacher_network}")
+        teacher_model = get_model(
+            cfg.teacher_network, dropout=0.0, fp16=False, num_features=cfg.embedding_size).cuda()
+
+        if os.path.exists(cfg.teacher_checkpoint):
+            teacher_weight = torch.load(cfg.teacher_checkpoint, map_location="cpu")
+            teacher_model.load_state_dict(teacher_weight, strict=False)
+            logging.info(f"Teacher loaded from {cfg.teacher_checkpoint}")
+        else:
+            logging.warning(f"Teacher checkpoint not found: {cfg.teacher_checkpoint}")
+
+        teacher_model.eval()
+        for p in teacher_model.parameters():
+            p.requires_grad = False
+
+        distill_criterion = EmbeddingDistillationLoss(
+            alpha=cfg.distill_alpha,
+            loss_type=cfg.distill_loss_type
+        )
+        logging.info(f"Distillation enabled: alpha={cfg.distill_alpha}, loss_type={cfg.distill_loss_type}")
 
     backbone = torch.nn.parallel.DistributedDataParallel(
         module=backbone, broadcast_buffers=False, device_ids=[local_rank], bucket_cap_mb=16,
@@ -194,6 +220,7 @@ def main(args):
     loss_am_dict = {"all": AverageMeter()}
     for i in range(num_dataset):
         loss_am_dict[i] = AverageMeter()
+    distill_am = AverageMeter()
 
     amp = torch.cuda.amp.grad_scaler.GradScaler(growth_interval=100)
 
@@ -230,9 +257,15 @@ def main(args):
                 img_list.append(img_batch)
                 local_labels_dict[i] = labels_batch
 
-            # --- Single forward through shared backbone ---
+            # --- Single forward through shared student backbone ---
             img = torch.cat(img_list, 0)
             local_embeddings_all = backbone(img)
+
+            # --- Teacher forward (frozen, no grad) ---
+            teacher_emb_all = None
+            if teacher_model is not None:
+                with torch.no_grad():
+                    teacher_emb_all = teacher_model(img)
 
             # --- Split embeddings back to per-dataset ---
             split_sizes = [img_list[i].shape[0] for i in range(num_dataset)]
@@ -249,7 +282,15 @@ def main(args):
                 loss_dict[i] = loss_i
                 loss_dict_with_weight[i] = loss_i * cfg.loss_w[i]
 
-            loss = sum(loss_dict_with_weight.values())
+            ce_loss = sum(loss_dict_with_weight.values())
+
+            # --- Distillation loss ---
+            if distill_criterion is not None and teacher_emb_all is not None:
+                loss, distill_loss_val = distill_criterion(
+                    local_embeddings_all, teacher_emb_all, ce_loss)
+            else:
+                loss = ce_loss
+                distill_loss_val = 0.0
 
             # --- Backward + gradient accumulation ---
             all_partial_fc_params = []
@@ -276,7 +317,7 @@ def main(args):
 
             # --- Logging ---
             with torch.no_grad():
-                # Per-dataset loss logging (each meter is independent, reset after log)
+                # Per-dataset loss logging
                 for i in range(num_dataset):
                     loss_am_dict[i].update(loss_dict[i].item(), 1)
                     callback_logging.self_callback_logging(
@@ -289,16 +330,23 @@ def main(args):
                     global_step, loss_am_dict["all"], epoch,
                     cfg.fp16, lr_scheduler.get_last_lr()[0], amp)
 
+                # Distill loss logging
+                if distill_loss_val > 0:
+                    distill_am.update(distill_loss_val, 1)
+
                 # WandB per-step logging
                 if wandb_logger:
                     wandb_log = {
                         'Loss/Step Loss': loss.item(),
                         'Loss/Train Loss': loss_am_dict["all"].avg,
+                        'Loss/CE Loss': ce_loss.item(),
                         'Process/Step': global_step,
                         'Process/Epoch': epoch,
                     }
                     for i in range(num_dataset):
                         wandb_log[f'Loss/dataset_{i}'] = loss_am_dict[i].avg
+                    if distill_loss_val > 0:
+                        wandb_log['Loss/Distill Loss'] = distill_loss_val
                     wandb_logger.log(wandb_log)
 
                 if global_step % cfg.verbose == 0 and global_step > 0:
@@ -346,6 +394,6 @@ def main(args):
 if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
     parser = argparse.ArgumentParser(
-        description="Distributed Arcface Multi-Dataset Training in Pytorch")
+        description="Distributed Arcface Multi-Dataset Training with Knowledge Distillation")
     parser.add_argument("config", type=str, help="py config file")
     main(parser.parse_args())
