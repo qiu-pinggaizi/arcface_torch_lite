@@ -36,6 +36,7 @@ Thumbs.db
 *.bin
 output/
 logs/
+!docs/logs/
 tensorboard/
 wandb/
 

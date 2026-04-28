@@ -16,7 +16,7 @@
 
 训练脚本: `train_multi_data.py`
 配置文件: `configs/glint360k_facesumd_r50_multi.py`
-状态: 训练在 Epoch 8 (Step ~298,640) 被系统终止，无代码错误
+训练日志: [multi_data_baseline_train.txt](logs/multi_data_baseline_train.txt)
 
 ### 验证结果 (Accuracy-Flip)
 
@@ -42,7 +42,7 @@
 
 训练脚本: `train_multi_data_distill.py`
 配置文件: `configs/glint360k_facesumd_mbf_v3_se_distill_multi.py`
-状态: 训练在 Epoch 4 (Step ~163,240) 被系统终止，无代码错误
+训练日志: [multi_data_distill_train.txt](logs/multi_data_distill_train.txt)
 
 - **Teacher**: ResNet-100 (冻结，预训练于 glint360k)
 - **蒸馏类型**: L2 归一化后的余弦相似度
