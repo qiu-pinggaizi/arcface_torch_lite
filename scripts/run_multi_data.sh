@@ -14,4 +14,4 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun \
     --master_addr="127.0.0.1" \
     --master_port=12345 \
     train_multi_data.py \
-    configs/glint360k_facesumd_r50_multi.py
+    configs/glint360k_facesumd_mbf_v3_se_multi.py

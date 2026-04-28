@@ -212,7 +212,7 @@ bash scripts/run_multi_data.sh
 
 ```bash
 CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --master_port 12345 --nproc_per_node=4 \
-    train_multi_data.py configs/glint360k_facesumd_r50_multi.py
+    train_multi_data.py configs/glint360k_facesumd_mbf_v3_se_multi.py
 ```
 
 多数据集配置示例：
