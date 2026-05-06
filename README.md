@@ -1,143 +1,154 @@
 # ArcFace Torch (Enhanced)
 
+**English** | [中文](README_zh.md)
+
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/killing-two-birds-with-one-stone-efficient/face-verification-on-ijb-c)](https://paperswithcode.com/sota/face-verification-on-ijb-c?p=killing-two-birds-with-one-stone-efficient)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/killing-two-birds-with-one-stone-efficient/face-verification-on-ijb-b)](https://paperswithcode.com/sota/face-verification-on-ijb-b?p=killing-two-birds-with-one-stone-efficient)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/killing-two-birds-with-one-stone-efficient/face-verification-on-agedb-30)](https://paperswithcode.com/sota/face-verification-on-agedb-30?p=killing-two-birds-with-one-stone-efficient)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/killing-two-birds-with-one-stone-efficient/face-verification-on-cfp-fp)](https://paperswithcode.com/sota/face-verification-on-cfp-fp?p=killing-two-birds-with-one-stone-efficient)
 
-> 基于 [InsightFace ArcFace Torch](https://github.com/deepinsight/insightface/tree/master/recognition/arcface_torch) 的增强版本。在保留原版全部能力的基础上，新增了**轻量化模型设计 (mbf_v3)**、**结构化剪枝**、**知识蒸馏**和**多数据集训练**四项核心改进，构建了面向边缘部署的完整模型压缩流水线。
+> An enhanced fork of [InsightFace ArcFace Torch](https://github.com/deepinsight/insightface/tree/master/recognition/arcface_torch). Building on the original codebase, this project adds four core improvements: **lightweight model design (mbf_v3)**, **structured pruning**, **knowledge distillation**, and **multi-dataset training** — forming a complete model compression pipeline for edge deployment.
 
-## 核心改进
+## Roadmap
 
-本项目在原版 ArcFace Torch 基础上做了三项主要改进：
+- [x] Lightweight models mbf_v3 / mbf_v3_se
+- [x] Structured pruning
+- [x] Knowledge distillation
+- [x] Multi-dataset training
+- [ ] Open-source more pre-trained lightweight models
+- [ ] Release WebFace42M dataset and trained models
+- [ ] Release multi-dataset trained models
+- [ ] Release a model trained on a private million-ID dataset
 
-### 1. 轻量化模型 mbf_v3
+## Key Improvements
 
-原版的 MobileFaceNet 系列采用 MobileNetV2 风格的倒残差结构（1x1 卷积升维 → 3x3 深度卷积 → 1x1 卷积降维 + 残差连接）。`mbf_v3` 在此基础上，通过调整 `scale`（通道宽度倍率）和 `blocks`（各阶段残差块数量）两个核心参数，在保持相同架构的前提下实现模型轻量化：
+### 1. Lightweight Model mbf_v3
 
-| 变体 | scale | blocks | 各阶段通道数 | 残差块总数 | 参数量 | FLOPs | 定位 |
-|------|-------|--------|-------------|-----------|--------|-------|------|
-| `mbf` | 2 | (1,4,6,2) | 128→128→256→256 | 13 | 2.05M | 0.45G | 原版超轻量 |
-| `mbf_large` | 4 | (2,8,12,4) | 256→256→512→512 | 26 | 6.30M | 1.85G | 原版大模型 |
-| **`mbf_v3`** | **3** | **(2,6,8,3)** | **192→192→384→384** | **19** | **3.71M** | **1.15G** | **新增轻量化** |
-| `mbf_v3_se` | 3 | (2,6,8,3) | 192→192→384→384 | 19+SE | 3.86M | 1.15G | 新增+注意力 |
+The original MobileFaceNet series uses MobileNetV2-style inverted residual blocks (1x1 conv expand → 3x3 depthwise conv → 1x1 conv project + residual). `mbf_v3` achieves lightweighting by tuning two core parameters — `scale` (channel width multiplier) and `blocks` (number of residual blocks per stage) — while keeping the same architecture:
 
-`mbf_v3` 相比 `mbf_large`：
-- **通道宽度**: scale 4→3，减少 25%
-- **网络深度**: blocks 总数 26→19，减少 27%
-- **参数量**: 6.3M→3.7M，减少 **41%**
-- **FLOPs**: 1.85G→1.15G，减少 **38%**
-- **架构不变**: 保持 MobileNetV2 倒残差 + 深度可分离卷积的设计
+| Variant | scale | blocks | Channels per stage | Total blocks | Params | FLOPs | Role |
+|---------|-------|--------|-------------------|--------------|--------|-------|------|
+| `mbf` | 2 | (1,4,6,2) | 128→128→256→256 | 13 | 2.05M | 0.45G | Original ultra-light |
+| `mbf_large` | 4 | (2,8,12,4) | 256→256→512→512 | 26 | 6.30M | 1.85G | Original large |
+| **`mbf_v3`** | **3** | **(2,6,8,3)** | **192→192→384→384** | **19** | **3.71M** | **1.15G** | **New lightweight** |
+| `mbf_v3_se` | 3 | (2,6,8,3) | 192→192→384→384 | 19+SE | 3.86M | 1.15G | New + attention |
 
-`mbf_v3_se` 在 `mbf_v3` 基础上引入 SE (Squeeze-and-Excitation) 注意力模块，参数仅增加 4% (3.71M→3.86M)，用于在蒸馏阶段提升精度。
+`mbf_v3` vs `mbf_large`:
+- **Channel width**: scale 4→3, **-25%**
+- **Depth**: blocks 26→19, **-27%**
+- **Parameters**: 6.3M→3.7M, **-41%**
+- **FLOPs**: 1.85G→1.15G, **-38%**
+- **Architecture preserved**: same MobileNetV2 inverted residual + depthwise separable design
 
-### 2. 结构化剪枝
+`mbf_v3_se` adds SE (Squeeze-and-Excitation) attention to `mbf_v3`, costing only +4% parameters (3.71M→3.86M), used to boost accuracy during distillation.
 
-基于 [Torch-Pruning](https://github.com/VainF/Torch-Pruning) 的 `GroupNormPruner`，对 `mbf_large` 进行通道级结构化剪枝：
+### 2. Structured Pruning
 
-- 使用 L2 范数作为通道重要性指标
-- 保护 GDC 头部（`features`、`conv_sep`）不被剪枝
-- 20% 剪枝率下精度损失 < 1%
+Channel-level structured pruning on `mbf_large` using [Torch-Pruning](https://github.com/VainF/Torch-Pruning)'s `GroupNormPruner`:
 
-### 3. 知识蒸馏
+- L2 norm as channel importance metric
+- GDC head (`features`, `conv_sep`) protected from pruning
+- < 1% accuracy drop at 20% pruning ratio
 
-从大模型 (Teacher) 向轻量化模型 (Student) 进行 Embedding 级蒸馏：
+### 3. Knowledge Distillation
+
+Embedding-level distillation from a large Teacher to a lightweight Student:
 
 - Teacher: `mbf_large` (6.3M) → Student: `mbf_v3_se` (3.9M)
-- 蒸馏损失: 余弦相似度 (cosine) 或 L2 范数
-- 总损失: `L = α * L_CE + (1-α) * L_distill`，α=0.5
+- Distillation loss: cosine similarity or L2 norm
+- Combined loss: `L = α * L_CE + (1-α) * L_distill`, α=0.5
 
-### 4. 多数据集训练
+### 4. Multi-Dataset Training
 
-原版 ArcFace Torch 仅支持单数据集训练。`train_multi_data.py` 实现了 N 数据集联合训练：
+The original ArcFace Torch only supports single-dataset training. `train_multi_data.py` implements N-dataset joint training:
 
-- **N 个 DataLoader** 同步迭代，每个数据集独立采样
-- **共享骨干网络** 单次前向传播，`torch.cat` → `backbone` → `torch.split`
-- **N 个 PartialFC 头** 每个数据集独立的分类头，独立的类别空间
-- **加权损失** `L = Σ(w_i * L_CE_i)`，可调节各数据集的贡献权重
-- **支持蒸馏** `train_multi_data_distill.py` 在多数据集基础上叠加知识蒸馏
+- **N DataLoaders** iterate in sync, each dataset sampled independently
+- **Shared backbone** with a single forward pass: `torch.cat` → `backbone` → `torch.split`
+- **N PartialFC heads** — one classification head per dataset with its own class space
+- **Weighted loss** `L = Σ(w_i * L_CE_i)` with adjustable per-dataset weights
+- **Distillation support** — `train_multi_data_distill.py` adds knowledge distillation on top
 
 ```
-DataLoader_A (glint360k)    DataLoader_B (faces_umd)     ← N 个数据集
+DataLoader_A (glint360k)    DataLoader_B (faces_umd)     ← N datasets
         ↓                           ↓
     img = torch.cat([img_A, img_B])
         ↓
-    backbone(img)                   ← 共享骨干，单次前向
+    backbone(img)                   ← Shared backbone, single forward
         ↓
     torch.split(embeddings)
         ↓                           ↓
-  PartialFC_A                 PartialFC_B               ← N 个独立分类头
+  PartialFC_A                 PartialFC_B               ← N independent heads
   loss_A * w_A                loss_B * w_B
         ↓                           ↓
     total_loss = Σ(loss_i * w_i)
         ↓
-    [可选] + distill_loss(teacher_emb, student_emb)      ← 叠加蒸馏
+    [optional] + distill_loss(teacher_emb, student_emb)  ← Add distillation
         ↓
-    total_loss.backward()          ← 单次反向传播
+    total_loss.backward()          ← Single backward pass
 ```
 
-### 压缩流水线
+### Compression Pipeline
 
 ```
-mbf_large (6.3M, 1.85G)              ← 原版大模型，作为 Teacher
+mbf_large (6.3M, 1.85G)              ← Original large model, serves as Teacher
     │
-    ├─→ 结构化剪枝 (20%) ─→ ~2.6M    ← 参数量 -32%，精度损失 < 1%
+    ├─→ Structured Pruning (20%) ─→ ~2.6M    ← -32% params, < 1% accuracy loss
     │
-    └─→ 知识蒸馏 ─→ mbf_v3_se (3.9M, 1.15G)  ← 参数量 -38%，由 Teacher 指导训练
+    └─→ Knowledge Distillation ─→ mbf_v3_se (3.9M, 1.15G)  ← -38% params, trained with Teacher guidance
                         │
-                        ├─→ 多数据集训练   ← 多个数据集联合训练，提升泛化性
+                        ├─→ Multi-dataset training   ← Joint training on multiple datasets
                         │
-                        └─→ ONNX 导出  ← 部署就绪
+                        └─→ ONNX export  ← Deployment ready
 ```
 
-## 项目结构
+## Project Structure
 
 ```
 arcface_torch/
-├── backbones/                 # 骨干网络定义
-│   ├── iresnet.py             #   iResNet 系列 (原版)
-│   ├── mobilefacenet.py       #   MobileFaceNet 系列 (原版 + 新增 mbf_v3/mbf_v3_se)
-│   ├── vit.py                 #   Vision Transformer (原版)
-│   └── modules/               #   子模块 (新增 SE 注意力)
-├── configs/                   # 训练配置 (原版 + 新增)
-├── eval/                      # 评估验证模块 (原版)
-├── utils/                     # 工具函数 (原版)
-├── scripts/                   # 训练和数据处理脚本
-├── tools/                     # 推理、导出和评估工具
-├── docs/                      # 文档 (原版)
+├── backbones/                 # Backbone definitions
+│   ├── iresnet.py             #   iResNet series (original)
+│   ├── mobilefacenet.py       #   MobileFaceNet series (original + new mbf_v3/mbf_v3_se)
+│   ├── vit.py                 #   Vision Transformer (original)
+│   └── modules/               #   Sub-modules (new SE attention)
+├── configs/                   # Training configs (original + new)
+├── eval/                      # Evaluation modules (original)
+├── utils/                     # Utility functions (original)
+├── scripts/                   # Training and data processing scripts
+├── tools/                     # Inference, export and evaluation tools
+├── docs/                      # Documentation
 │
-├── train_v2.py               # 标准训练 (原版)
-├── train_v2_distill.py       # 单数据集蒸馏训练 (新增)
-├── train_v2_prune.py         # 剪枝训练 (新增)
-├── train_multi_data.py       # 多数据集训练 (新增)
-├── train_multi_data_distill.py  # 多数据集 + 蒸馏训练 (新增)
-├── dataset.py                # 数据加载 (原版 + 新增 next_item)
-├── losses.py                 # ArcFace/CosFace 损失 (原版)
-├── losses_distill.py         # 蒸馏损失 (新增)
-├── partial_fc_v2.py          # PartialFC (原版)
-└── lr_scheduler.py           # 学习率调度器 (原版)
+├── train_v2.py               # Standard training (original)
+├── train_v2_distill.py       # Single-dataset distillation training (new)
+├── train_v2_prune.py         # Pruning training (new)
+├── train_multi_data.py       # Multi-dataset training (new)
+├── train_multi_data_distill.py  # Multi-dataset + distillation training (new)
+├── dataset.py                # Data loading (original + new next_item)
+├── losses.py                 # ArcFace/CosFace loss (original)
+├── losses_distill.py         # Distillation loss (new)
+├── partial_fc_v2.py          # PartialFC (original)
+└── lr_scheduler.py           # Learning rate scheduler (original)
 ```
 
-## 环境要求
+## Requirements
 
 - Python >= 3.8
 - PyTorch >= 1.12.0
 - CUDA >= 11.0
 
-### 安装
+### Installation
 
 ```bash
 pip install -r requirements.txt
-pip install torch-pruning  # 剪枝功能依赖
+pip install torch-pruning  # Required for pruning
 ```
 
-## 快速开始
+## Quick Start
 
-### 数据集准备
+### Dataset Preparation
 
-使用 Glint360K (360K 身份, 17.1M 图片) 训练，数据格式为 MXNet RecordIO (`train.rec`, `train.idx`)。
+Training uses Glint360K (360K identities, 17.1M images) in MXNet RecordIO format (`train.rec`, `train.idx`).
 
-修改配置文件中的数据集路径：
+Update dataset paths in the config file:
 
 ```python
 config.rec = "/path/to/glint360k"
@@ -145,118 +156,111 @@ config.num_classes = 360232
 config.num_image = 17091657
 ```
 
-### 轻量化实验流水线
+### Lightweight Experiment Pipeline
 
-以下为完整的轻量化实验步骤，基于 Glint360K 数据集，4 GPU 训练：
+Complete lightweight experiment steps using Glint360K on 4 GPUs:
 
-#### Step 1: ResNet-100 基线 (参考)
+#### Step 1: ResNet-100 Baseline (Reference)
 
 ```bash
-# 4 GPU 训练 ResNet-100 基线模型
 CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --nproc_per_node=4 train_v2.py \
     --config configs/glint360k_r100.py
 ```
 
-> ResNet-100 (63M, 250MB) 作为大模型精度天花板参考。
+> ResNet-100 (63M, 250MB) serves as the accuracy ceiling reference.
 
-#### Step 2: mbf_v3 基线训练
+#### Step 2: mbf_v3 Baseline
 
 ```bash
-# Phase 1: mbf_v3 轻量化基线 (3.7M, scale=3, blocks=(2,6,8,3))
 bash scripts/run_mbf_v3.sh
 ```
 
-实际执行命令：
+Actual command:
 
 ```bash
 CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --master_port 29522 --nproc_per_node=4 \
     train_v2_prune.py --config configs/glint360k_mbf_v3.py
 ```
 
-#### Step 3: mbf_v3 + SE 注意力
+#### Step 3: mbf_v3 + SE Attention
 
 ```bash
-# Phase 2: mbf_v3_se 增加 SE 注意力模块 (3.9M)
 bash scripts/run_mbf_v3_se.sh
 ```
 
-实际执行命令：
+Actual command:
 
 ```bash
 CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --master_port 29523 --nproc_per_node=4 \
     train_v2_prune.py --config configs/glint360k_mbf_v3_se.py
 ```
 
-#### Step 4: 知识蒸馏
+#### Step 4: Knowledge Distillation
 
 ```bash
-# Phase 3: Teacher(mbf_large) → Student(mbf_v3_se), cosine 蒸馏
 bash scripts/run_mbf_v3_se_distill.sh
 ```
 
-实际执行命令：
+Actual command:
 
 ```bash
 CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --master_port 29524 --nproc_per_node=4 \
     train_v2_distill.py --config configs/glint360k_mbf_v3_se_distill.py
 ```
 
-#### Step 5: 多数据集训练
+#### Step 5: Multi-Dataset Training
 
 ```bash
-# 多数据集联合训练 (glint360k + faces_umd)
 bash scripts/run_multi_data.sh
 ```
 
-实际执行命令：
+Actual command:
 
 ```bash
 CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --master_port 12345 --nproc_per_node=4 \
     train_multi_data.py configs/glint360k_facesumd_mbf_v3_se_multi.py
 ```
 
-多数据集配置示例：
+Multi-dataset config example:
 
 ```python
 config.rec = ["/path/to/glint360k", "/path/to/faces_umd"]
 config.num_classes = [360232, 8277]
 config.num_image = [17091657, 811440]
-config.batch_size = [128, 128]           # 每个数据集独立的 batch_size
-config.loss_w = [0.7, 0.3]              # 加权损失权重
+config.batch_size = [128, 128]           # Per-dataset batch_size
+config.loss_w = [0.7, 0.3]              # Weighted loss coefficients
 ```
 
-#### Step 6: 多数据集 + 蒸馏训练
+#### Step 6: Multi-Dataset + Distillation
 
 ```bash
-# 多数据集 + 知识蒸馏 (Teacher: R100, Student: mbf_v3_se)
 bash scripts/run_multi_data_distill.sh
 ```
 
-实际执行命令：
+Actual command:
 
 ```bash
 CUDA_VISIBLE_DEVICES=4,5,6,7 torchrun --master_port 12346 --nproc_per_node=4 \
     train_multi_data_distill.py configs/glint360k_facesumd_mbf_v3_se_distill_multi.py
 ```
 
-蒸馏额外配置：
+Extra distillation config:
 
 ```python
 config.distill = True
 config.teacher_network = "r100"
 config.teacher_checkpoint = "/path/to/r100/model.pt"
-config.distill_alpha = 0.5              # CE 权重，(1-alpha) 为蒸馏权重
-config.distill_loss_type = "cosine"     # cosine 相似度蒸馏
+config.distill_alpha = 0.5              # CE weight, (1-alpha) = distillation weight
+config.distill_loss_type = "cosine"     # Cosine similarity distillation
 ```
 
-#### Step 7: 蒸馏 + 通道剪枝
+#### Step 7: Distillation + Channel Pruning
 
 ```bash
-# 蒸馏同时进行 20% 通道剪枝
 bash scripts/run_mbf_v3_se_distill_prune.sh
 ```
 
-实际执行命令：
+Actual command:
 
 ```bash
 CUDA_VISIBLE_DEVICES=4,5,6,7 torchrun --master_port 29526 --nproc_per_node=4 \
@@ -264,61 +268,61 @@ CUDA_VISIBLE_DEVICES=4,5,6,7 torchrun --master_port 29526 --nproc_per_node=4 \
     --prune_ratio 0.2
 ```
 
-### 模型验证与导出
+### Model Validation & Export
 
 ```bash
-# 标准模型验证
+# Standard model validation
 CUDA_VISIBLE_DEVICES=0 python tools/inference_val.py \
     --config configs/glint360k_mbf_v3_se.py \
     --network mbf_v3_se \
     --weight /path/to/model.pt
 
-# 剪枝模型验证
+# Pruned model validation
 CUDA_VISIBLE_DEVICES=0 python tools/inference_val_prune.py \
     --config configs/glint360k_mbf_v3_se.py \
     --network mbf_v3_se \
     --weight /path/to/pruned/model.pt \
     --prune_ratio 0.2
 
-# 剪枝模型验证并导出 ONNX
+# Pruned model validation + ONNX export
 CUDA_VISIBLE_DEVICES=0 python tools/inference_val_prune.py \
     --config configs/glint360k_mbf_v3_se.py \
     --network mbf_v3_se \
     --weight /path/to/pruned/model.pt \
     --prune_ratio 0.2 --onnx
 
-# 标准 ONNX 导出
+# Standard ONNX export
 python tools/torch2onnx.py \
     --input /path/to/model.pt \
     --output /path/to/model.onnx \
     --network mbf_v3_se
 
-# 模型复杂度分析
+# Model complexity analysis
 python tools/flops.py mbf_v3_se
 ```
 
-## 支持的骨干网络
+## Supported Backbones
 
-### 原版网络
+### Original Networks
 
-| 网络 | 说明 |
-|------|------|
-| `r18` / `r34` / `r50` / `r100` / `r200` | iResNet 系列 |
+| Network | Description |
+|---------|-------------|
+| `r18` / `r34` / `r50` / `r100` / `r200` | iResNet series |
 | `mbf` | MobileFaceNet (2.05M, 0.45G) |
 | `mbf_large` | MobileFaceNet Large (6.3M) |
-| `vit_t` / `vit_s` / `vit_b` / `vit_l` / `vit_h` | Vision Transformer 系列 |
+| `vit_t` / `vit_s` / `vit_b` / `vit_l` / `vit_h` | Vision Transformer series |
 
-### 新增轻量化网络
+### New Lightweight Networks
 
-| 网络 | 说明 |
-|------|------|
-| `mbf_v3` | 基于原版 MobileFaceNet 调整 scale/blocks 的轻量化版本 (3.7M) |
-| `mbf_v3_se` | mbf_v3 + SE 注意力模块 (3.9M) |
+| Network | Description |
+|---------|-------------|
+| `mbf_v3` | Lightweight MobileFaceNet with tuned scale/blocks (3.7M) |
+| `mbf_v3_se` | mbf_v3 + SE attention module (3.9M) |
 
-## 支持的数据集
+## Supported Datasets
 
-| 数据集 | 身份数 | 图片数 |
-|--------|--------|--------|
+| Dataset | Identities | Images |
+|---------|-----------|--------|
 | MS1MV2 | 87K | 5.8M |
 | MS1MV3 | 93K | 5.2M |
 | Glint360K | 360K | 17.1M |
@@ -326,91 +330,91 @@ python tools/flops.py mbf_v3_se
 | WebFace12M | 600K | 12M |
 | WebFace42M | 2M | 42.5M |
 
-数据格式: MXNet RecordIO (`train.rec`, `train.idx`)。参考 [prepare_custom_dataset.md](docs/prepare_custom_dataset.md) 准备自定义数据集。
+Data format: MXNet RecordIO (`train.rec`, `train.idx`). See [prepare_custom_dataset.md](docs/prepare_custom_dataset.md) for custom dataset preparation.
 
-## 训练配置
+## Training Configuration
 
-所有配置文件位于 `configs/` 目录，继承自 `configs/base.py`：
+All config files are in `configs/`, inheriting from `configs/base.py`:
 
 ```python
-config.network = "mbf_v3_se"      # 骨干网络
-config.embedding_size = 512        # 特征维度
-config.batch_size = 256            # 每 GPU 批大小
-config.lr = 0.1                    # 学习率
-config.optimizer = "sgd"           # 优化器 (sgd/adamw)
-config.margin_list = (1.0, 0.0, 0.4)  # CosFace 损失
-config.sample_rate = 0.9           # PartialFC 采样率
-config.fp16 = True                 # 混合精度训练
-config.gradient_acc = 2            # 梯度累积步数
-config.num_epoch = 90              # 训练轮数
-config.rec = "/path/to/dataset"    # 数据集路径
-config.num_classes = 360232        # 类别数
+config.network = "mbf_v3_se"      # Backbone
+config.embedding_size = 512        # Feature dimension
+config.batch_size = 256            # Per-GPU batch size
+config.lr = 0.1                    # Learning rate
+config.optimizer = "sgd"           # Optimizer (sgd/adamw)
+config.margin_list = (1.0, 0.0, 0.4)  # CosFace loss
+config.sample_rate = 0.9           # PartialFC sampling rate
+config.fp16 = True                 # Mixed precision training
+config.gradient_acc = 2            # Gradient accumulation steps
+config.num_epoch = 90              # Training epochs
+config.rec = "/path/to/dataset"    # Dataset path
+config.num_classes = 360232        # Number of classes
 ```
 
-蒸馏训练额外配置：
+Extra config for distillation:
 
 ```python
 config.distill = True
 config.teacher_network = "mbf_large"
 config.teacher_checkpoint = "/path/to/teacher/model.pt"
-config.distill_alpha = 0.5         # CE 和蒸馏损失的权重
+config.distill_alpha = 0.5         # CE vs distillation loss weight
 config.distill_loss_type = "cosine" # cosine / l2
 ```
 
-多数据集训练额外配置：
+Extra config for multi-dataset training:
 
 ```python
-config.rec = ["/path/to/dataset_A", "/path/to/dataset_B"]  # N 个数据集路径
-config.num_classes = [360232, 8277]      # 每个数据集的类别数
-config.num_image = [17091657, 811440]    # 每个数据集的图片数
-config.batch_size = [128, 128]           # 每个数据集的 batch_size
-config.loss_w = [0.7, 0.3]              # 加权损失权重
+config.rec = ["/path/to/dataset_A", "/path/to/dataset_B"]  # N dataset paths
+config.num_classes = [360232, 8277]      # Per-dataset class count
+config.num_image = [17091657, 811440]    # Per-dataset image count
+config.batch_size = [128, 128]           # Per-dataset batch_size
+config.loss_w = [0.7, 0.3]              # Weighted loss coefficients
 ```
 
 ---
 
-## 实验结果
+## Experimental Results
 
-> 训练数据集: Glint360K (360K 身份, 17.1M 图片)，验证集: 7 个 benchmark。
+> Training dataset: Glint360K (360K identities, 17.1M images). Evaluation: 7 benchmarks.
 
-### 轻量化流水线对比
+### Lightweight Pipeline Comparison
 
-| 阶段 | 模型 | 参数量 | 体积 | LFW | VGG2_FP | AgeDB_30 | CALFW | CFP_FF | CPLFW | CFP_FP |
-|------|------|--------|------|-----|---------|----------|-------|--------|-------|--------|
-| 参考基线 | ResNet-100 | 63M | 250MB | 99.82% | 96.02% | 98.77% | 96.05% | 99.84% | 94.85% | 99.27% |
+| Phase | Model | Params | Size | LFW | VGG2_FP | AgeDB_30 | CALFW | CFP_FF | CPLFW | CFP_FP |
+|-------|-------|--------|------|-----|---------|----------|-------|--------|-------|--------|
+| Reference | ResNet-100 | 63M | 250MB | 99.82% | 96.02% | 98.77% | 96.05% | 99.84% | 94.85% | 99.27% |
 | Phase 1 | mbf_v3 | 3.7M | 15MB | 99.78% | 95.54% | 97.83% | 96.03% | 99.89% | 93.43% | 98.44% |
 | Phase 2 | mbf_v3_se | 3.9M | 16MB | 99.83% | 95.76% | 98.05% | 96.10% | 99.91% | 93.52% | 98.71% |
-| Phase 3 | 蒸馏 | 3.9M | 16MB | 99.83% | 95.64% | 97.93% | 96.13% | 99.87% | 93.53% | 98.64% |
-| Phase 3+ | 蒸馏+剪枝 | 2.6M | 11MB | 99.82% | 95.52% | 97.80% | 96.02% | 99.86% | 93.00% | 98.26% |
+| Phase 3 | Distill | 3.9M | 16MB | 99.83% | 95.64% | 97.93% | 96.13% | 99.87% | 93.53% | 98.64% |
+| Phase 3+ | Distill+Prune | 2.6M | 11MB | 99.82% | 95.52% | 97.80% | 96.02% | 99.86% | 93.00% | 98.26% |
 
-### 关键发现
+### Key Findings
 
-1. **mbf_v3 参数量 -41%** (6.3M→3.7M)，LFW 仅降 0.09%，scale/blocks 调整策略有效
-2. **SE 模块代价 +4% 参数**，7 个验证集平均 +0.13%，性价比高
-3. **20% 通道剪枝体积 -32%** (16MB→11MB)，精度仅降 0.01%~0.53%
-4. **最终模型 mbf_v3_se_distill_prune**: 11MB / LFW 99.82%，相比 ResNet-100 (250MB) 体积减少 **96%**，LFW 仅低 0.01%
+1. **mbf_v3: -41% parameters** (6.3M→3.7M), LFW drops only 0.09% — scale/blocks tuning is effective
+2. **SE module: +4% parameters**, average +0.13% across 7 benchmarks — high cost-effectiveness
+3. **20% channel pruning: -32% size** (16MB→11MB), accuracy drops only 0.01%~0.53%
+4. **Final model mbf_v3_se_distill_prune**: 11MB / LFW 99.82% vs ResNet-100 (250MB) — **96% size reduction**, only 0.01% lower on LFW
 
-> 详细实验报告见 [docs/lightweight_experiment_report.md](docs/lightweight_experiment_report.md)
+> Detailed report: [docs/lightweight_experiment_report.md](docs/lightweight_experiment_report.md)
 
-### 多数据集训练实验
+### Multi-Dataset Training Experiments
 
-> 训练数据集: Glint360K (360K 身份, 17.1M 图片) + Faces_UMD (8K 身份, 0.8M 图片)，
-> 验证集: LFW, CFP-FP, AgeDB-30，10 个 epoch，4 GPU 训练。
+> Training: Glint360K (360K IDs, 17.1M images) + Faces_UMD (8K IDs, 0.8M images).
+> Evaluation: LFW, CFP-FP, AgeDB-30, 10 epochs, 4 GPUs.
 
-| 实验 | 模型 | LFW | CFP-FP | AgeDB-30 | 说明 |
-|------|------|-----|--------|----------|------|
-| 多数据集基线 | mbf_v3_se | 99.77% | 97.64% | 97.22% | 两个数据集加权联合训练 |
-| 多数据集+蒸馏 | mbf_v3_se | 99.73% | 97.20% | **97.35%** | 叠加 R100 Teacher 蒸馏 |
+| Experiment | Model | LFW | CFP-FP | AgeDB-30 | Description |
+|------------|-------|-----|--------|----------|-------------|
+| Multi-dataset baseline | mbf_v3_se | 99.77% | 97.64% | 97.22% | Weighted joint training on two datasets |
+| Multi-dataset + distill | mbf_v3_se | 99.73% | 97.20% | **97.35%** | Combined with R100 Teacher distillation |
 
-#### 关键发现
+#### Key Findings
 
-1. **蒸馏在难任务上更有优势**: AgeDB-30 (年龄变化) 是最具挑战性的验证集，蒸馏达到 97.35%，超过基线的 97.22%
-2. **训练效率**: 蒸馏在更少的 step (162k vs 298k) 就达到了可比的性能，尽管每步因 Teacher 前向传播慢约 2x
-3. **多数据集+蒸馏可叠加**: 两种技术互不冲突，可组合使用以提升模型泛化能力
+1. **Distillation excels on hard tasks**: AgeDB-30 (age variation) is the most challenging benchmark, where distillation reaches 97.35%, surpassing the baseline's 97.22%
+2. **Training efficiency**: Distillation achieves comparable performance in fewer steps (162k vs 298k), though each step is ~2x slower due to Teacher forward pass
+3. **Multi-dataset + distillation are composable**: The two techniques don't conflict and can be combined for improved generalization
 
-> 详细实验数据见 [docs/multi_dataset_experiment_results.md](docs/multi_dataset_experiment_results.md)
+> Detailed results: [docs/multi_dataset_experiment_results.md](docs/multi_dataset_experiment_results.md)
 
-## 参考文献
+## References
 
 ```bibtex
 @inproceedings{deng2019arcface,
@@ -435,8 +439,8 @@ config.loss_w = [0.7, 0.3]              # 加权损失权重
 }
 ```
 
-## 致谢
+## Acknowledgements
 
-- [InsightFace](https://github.com/deepinsight/insightface) - 原版 ArcFace Torch 项目
-- [cavaface.pytorch](https://github.com/cavalleria/cavaface.pytorch) - MobileFaceNet 实现参考
-- [Torch-Pruning](https://github.com/VainF/Torch-Pruning) - 结构化剪枝库
+- [InsightFace](https://github.com/deepinsight/insightface) - Original ArcFace Torch project
+- [cavaface.pytorch](https://github.com/cavalleria/cavaface.pytorch) - MobileFaceNet implementation reference
+- [Torch-Pruning](https://github.com/VainF/Torch-Pruning) - Structured pruning library
