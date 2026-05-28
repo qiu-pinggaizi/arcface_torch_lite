@@ -16,7 +16,7 @@
 - [x] 知识蒸馏
 - [x] 多数据集训练
 - [ ] 开源更多已经训练好的轻量化模型
-- [ ] 开源 WebFace42M 数据以及训练好的多个模型
+- [x] 开源 WebFace42M 训练好的模型 (r50 teacher + mbf_v3_se 蒸馏)
 - [ ] 开源多数据集训练好的模型
 - [ ] 开源一个私有百万 ID 数据集训练好的模型
 
@@ -405,6 +405,49 @@ config.loss_w = [0.7, 0.3]              # 加权损失权重
 
 > 详细实验报告见 [docs/lightweight_experiment_report.md](docs/lightweight_experiment_report.md)
 
+### WebFace42M 训练实验
+
+> 训练数据集: WebFace42M (2M 身份, 42.5M 图片)。Teacher: ResNet-50, Student: mbf_v3_se (3.9M)。
+
+#### Step 1: WF42M r50 Teacher 训练
+
+```bash
+bash scripts/run_wf42m_r50.sh
+```
+
+实际执行命令：
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --master_port 29531 --nproc_per_node=4 \
+    train_v2.py --config configs/wf42m_pfc02_4gpus_r50.py
+```
+
+配置要点：`sample_rate=0.2`，`lr=0.4`，`batch_size=256`，30 个 epoch。
+
+#### Step 2: 蒸馏到 mbf_v3_se
+
+```bash
+bash scripts/run_wf42m_mbf_v3_se_distill.sh
+```
+
+实际执行命令：
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --master_port 29532 --nproc_per_node=4 \
+    train_v2_distill.py --config configs/wf42m_mbf_v3_se_distill.py
+```
+
+配置要点：Teacher=r50，cosine 蒸馏，`lr=0.1`，`sample_rate=0.2`，30 个 epoch（第 26 个 epoch 已收敛）。
+
+#### 实验结果
+
+| 模型 | 参数量 | LFW | CFP-FP | AgeDB-30 | 数据集 | 备注 |
+|------|--------|-----|--------|----------|--------|------|
+| r50 (Teacher) | 63M | 99.8% | 98.6% | 97.5% | WF42M | 30 epochs, PFC-0.2 |
+| mbf_v3_se (蒸馏) | 3.9M | 99.8% | 98.8% | 97.5% | WF42M | r50→mbf_v3_se, 第 26 epoch 收敛 |
+
+> 预训练模型位于 `results/wf42m_r50/model.pt` 和 `results/wf42m_mbf_v3_se_distill/model.pt`（Git LFS 追踪）。
+
 ### 多数据集训练实验
 
 > 训练数据集: Glint360K (360K 身份, 17.1M 图片) + Faces_UMD (8K 身份, 0.8M 图片)，
@@ -447,6 +490,16 @@ config.loss_w = [0.7, 0.3]              # 加权损失权重
   year={2021}
 }
 ```
+
+## 更新日志
+
+- **2026-05-28**: WF42M 训练结果开源 — r50 Teacher (LFW 99.8%) + mbf_v3_se 蒸馏模型 (3.9M, LFW 99.8%)，预训练权重通过 Git LFS 发布
+- **2026-04-27**: Glint360K 多数据集训练 — mbf_v3_se 联合 Glint360K + Faces_UMD 训练，叠加 R100 蒸馏，AgeDB-30 达到 97.35%
+- **2026-04-25**: Glint360K 蒸馏+剪枝实验 — mbf_v3_se_distill_prune (2.6M, 11MB)，LFW 99.82%
+- **2026-04-24**: Glint360K 蒸馏实验 — mbf_large → mbf_v3_se 蒸馏，7 个 benchmark 对比
+- **2026-04-22**: mbf_v3_se 基线 — 新增 SE 注意力模块，参数仅 +4%，精度全面提升
+- **2026-04-21**: mbf_v3 轻量化模型 — scale/blocks 调整，参数量 -41% (6.3M→3.7M)
+- **2026-04-20**: 项目初始化 — 基于 InsightFace ArcFace Torch，新增蒸馏、剪枝、多数据集训练框架
 
 ## 致谢
 
