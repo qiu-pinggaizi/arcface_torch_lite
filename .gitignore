@@ -60,3 +60,7 @@ experiments/*/weights/
 *.tmp
 *.log
 *.bak
+
+# Allow training results
+!results/**/*.pt
+!results/**/*.log
